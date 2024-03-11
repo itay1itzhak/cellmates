@@ -121,7 +121,7 @@ class CellMatesTransformer(nn.Module):
             hidden_BLD = layer(hidden_BLD, distance_idxs_BLL, self.distance_embeddings)
 
         # Apply MLP to the pooled cell-representations:
-        output_BD = hidden_BLD.sum(dim=1)
+        output_BD = hidden_BLD.sum(dim=1)  # TODO - don't sum padding vectors
         output_BM = self.mlp_dropout(F.relu(self.mlp_linear1(output_BD)))
         output_B1 = self.mlp_linear2(output_BM)
 
@@ -149,7 +149,7 @@ class CellMatesEncoderLayer(nn.Module):
         K: int = 512,  # K
         F: int = 2048,  # F
         dropout_p: float = 0.1,
-        activation: str | Callable[[Tensor], Tensor] = F.gelu,
+        activation: Callable[[Tensor], Tensor] = F.gelu,
         layer_norm_eps: float = 1e-5,
         # batch_first: bool = False,
         norm_first: bool = False,
@@ -169,19 +169,15 @@ class CellMatesEncoderLayer(nn.Module):
         self.linear2 = Linear(F, D, bias=bias, **factory_kwargs)
 
         self.norm_first = norm_first
-        self.norm1 = LayerNorm(D, eps=layer_norm_eps, bias=bias, **factory_kwargs)
-        self.norm2 = LayerNorm(D, eps=layer_norm_eps, bias=bias, **factory_kwargs)
+        self.norm1 = LayerNorm(D, eps=layer_norm_eps, bias=bias, **factory_kwargs)  # type: ignore
+        self.norm2 = LayerNorm(D, eps=layer_norm_eps, bias=bias, **factory_kwargs)  # type: ignore
         self.dropout1 = Dropout(dropout_p)
         self.dropout2 = Dropout(dropout_p)
 
         self.activation = activation
 
     def forward(
-        self,
-        src: Tensor,
-        src_mask: Tensor | None = None,
-        src_key_padding_mask: Tensor | None = None,
-        is_causal: bool = False,
+        self, x_BLD: Tensor, distance_idxs_BLL: Tensor, distance_embeddings: ModuleDict
     ) -> Tensor:
         r"""Pass the input through the encoder layer.
 
@@ -200,38 +196,43 @@ class CellMatesEncoderLayer(nn.Module):
         Shape:
             see the docs in Transformer class.
         """
-        x = src
+        key_padding_mask = None
         if self.norm_first:
-            x = x + self._sa_block(
-                self.norm1(x), src_mask, src_key_padding_mask, is_causal=is_causal
+            x_BLD = x_BLD + self._sa_block(
+                self.norm1(x_BLD),
+                distance_idxs_BLL=distance_idxs_BLL,
+                distance_embeddings=distance_embeddings,
+                key_padding_mask=key_padding_mask,
             )
-            x = x + self._ff_block(self.norm2(x))
+            x_BLD = x_BLD + self._ff_block(self.norm2(x_BLD))
         else:
-            x = self.norm1(
-                x
-                + self._sa_block(x, src_mask, src_key_padding_mask, is_causal=is_causal)
+            x_BLD = self.norm1(
+                x_BLD
+                + self._sa_block(
+                    x_BLD,
+                    distance_idxs_BLL=distance_idxs_BLL,
+                    distance_embeddings=distance_embeddings,
+                    key_padding_mask=key_padding_mask,
+                )
             )
-            x = self.norm2(x + self._ff_block(x))
+            x_BLD = self.norm2(x_BLD + self._ff_block(x_BLD))
 
-        return x
+        return x_BLD
 
     # self-attention block
     def _sa_block(
         self,
-        x: Tensor,
-        attn_mask: Tensor | None = None,
+        x_BLD: Tensor,
+        distance_idxs_BLL: Tensor,
+        distance_embeddings: ModuleDict,
         key_padding_mask: Tensor | None = None,
-        is_causal: bool = False,
     ) -> Tensor:
-        x = self.self_attn(
-            x,
-            x,
-            x,
-            attn_mask=attn_mask,
-            key_padding_mask=key_padding_mask,
-            need_weights=False,
-            is_causal=is_causal,
-        )[0]
+        x = self.attn(
+            x_BLD,
+            distance_idxs_BLL,
+            distance_embeddings,
+            key_padding_mask=key_padding_mask,  # for differenet length batches
+        )
         return self.dropout1(x)
 
     # feed forward block
@@ -265,7 +266,11 @@ class SpatialMultiHeadAttention(nn.Module):
         self.sqrt_K = torch.FloatTensor([sqrt(K)]).to(device)
 
     def forward(
-        self, x_BLD: Tensor, distance_idxs_BLL: Tensor, distance_embeddings: ModuleDict
+        self,
+        x_BLD: Tensor,
+        distance_idxs_BLL: Tensor,
+        distance_embeddings: ModuleDict,
+        key_padding_mask: Tensor | None = None,
     ):
 
         # set dims:
