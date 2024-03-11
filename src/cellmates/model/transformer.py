@@ -20,6 +20,8 @@ from math import sqrt
 DISTANCE_BINS = torch.arange(10, 150, 10)
 N_DISTANCES = len(DISTANCE_BINS)
 
+RESPONDER_CELL_IDX = 0
+
 
 def bucketize_distances(distances: Tensor):
     return torch.bucketize(distances, DISTANCE_BINS, right=False)
@@ -75,7 +77,7 @@ class CellMatesTransformer(nn.Module):
         self.distance_embeddings = ModuleDict(
             {
                 k: Embedding(num_embeddings=N_DISTANCES, embedding_dim=K)
-                for k in ["K_qk", "K_qr", "K_kr", "V_qk", "V_qr", "V_kr"]
+                for k in ["Kqk", "Kqr", "Kkr", "Vqk", "Vqr", "Vkr"]
             }
         )
 
@@ -159,7 +161,7 @@ class CellMatesEncoderLayer(nn.Module):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
 
-        self.attn = SpatialMultiHeadAttention()
+        self.attn = SpatialMultiHeadAttention(D, H, K, device)
 
         # Implementation of Feedforward model
         self.linear1 = Linear(D, F, bias=bias, **factory_kwargs)
@@ -244,7 +246,7 @@ class SpatialMultiHeadAttention(nn.Module):
         D: int,  # D
         H: int,  # H
         K: int,  # K
-        device: str,
+        device: str | None = None,
     ) -> None:
         super().__init__()
 
@@ -262,7 +264,9 @@ class SpatialMultiHeadAttention(nn.Module):
         # init scaler and move to device:
         self.sqrt_K = torch.FloatTensor([sqrt(K)]).to(device)
 
-    def forward(self, x_BLD):
+    def forward(
+        self, x_BLD: Tensor, distance_idxs_BLL: Tensor, distance_embeddings: ModuleDict
+    ):
 
         # set dims:
         B, L, D = x_BLD.shape
@@ -278,13 +282,55 @@ class SpatialMultiHeadAttention(nn.Module):
         K_BLHK = K_BLD.view(B, L, H, K)
         V_BLHK = V_BLD.view(B, L, H, K)
 
-        # attention scores:
+        """
+        Attention score components:
+        """
+        # 1 - vanilla:
         E_BHLL = torch.einsum("BLHK,BXHK->BHLX", Q_BLHK, K_BLHK)
-        E_BHLL = E_BHLL / self.sqrt_K
+        E_BHLL = E_BHLL
+
+        # 2 - qk distances:
+        Kqk_BLLK = distance_embeddings["Kqk"](distance_idxs_BLL)
+        Eqk_BHLL = torch.einsum("BLHK,BLXK -> BHLX", Q_BLHK, Kqk_BLLK)
+
+        # 3 - qr distances
+        dist_to_r_idxs_BL = distance_idxs_BLL[:, RESPONDER_CELL_IDX]
+        Kqr_BLK = distance_embeddings["Kqr"](dist_to_r_idxs_BL)
+        Eqr_BHL = torch.einsum("BLHK,BLK -> BHL", Q_BLHK, Kqr_BLK)
+        # identical score for all j:
+        Eqr_BHLL = Eqr_BHL.unsqueeze(-1).expand((B, H, L, L))
+
+        # 4 - kr distances
+        Kkr_BLK = distance_embeddings["Kkr"](dist_to_r_idxs_BL)
+        Ekr_BHLL = torch.einsum("BLHK,BXK -> BHLX", Q_BLHK, Kkr_BLK)
+
+        # sum:
+        E_BHLL = E_BHLL + Eqk_BHLL + Eqr_BHLL + Ekr_BHLL
         E_BHLL = torch.softmax(E_BHLL, dim=-1)
 
-        # BHLL,BLHK->BHLK
+        """
+        Value vector components:
+        """
+        # 1 - vanilla:
         Z_BLHK = torch.einsum("BHLX,BXHK->BLHK", E_BHLL, V_BLHK)
+
+        # 2 - qk:
+        Vqk_BLLK = distance_embeddings["Vqk"](distance_idxs_BLL)
+        Zqk_BLHK = torch.einsum("BHLX,BLXK->BLHK", E_BHLL, Vqk_BLLK)
+
+        # 3 - qr:
+        Zqr_BLK = distance_embeddings["Vqr"](
+            dist_to_r_idxs_BL
+        )  # _Z_qr is not a bug! Weights sum to one
+        Zqr_BHLK = Zqr_BLK.unsqueeze(1).expand((B, H, L, K))
+        Zqr_BLHK = Zqr_BHLK.permute(0, 2, 1, 3)
+
+        # 4 - kr:
+        Vkr_BLK = distance_embeddings["Vkr"](dist_to_r_idxs_BL)
+        Zkr_BLHK = torch.einsum("BHLX,BXK->BLHK", E_BHLL, Vkr_BLK)
+
+        # sum value components:
+        Z_BLHK = Z_BLHK + Zqk_BLHK + Zqr_BLHK + Zkr_BLHK
 
         # concat all head computations:
         Z_BLD = Z_BLHK.reshape(B, L, D)
