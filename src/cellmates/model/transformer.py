@@ -10,6 +10,7 @@ from torch.nn import (
     ModuleList,
 )
 from typing import Callable
+from math import sqrt
 
 
 # We discretize distances in jumps of 10 microns.
@@ -78,7 +79,7 @@ class CellMatesTransformer(nn.Module):
             }
         )
 
-        # Encoder layers contain spatial multi-head attention:
+        # Encoder layers perform spatial multi-head attention:
         encoder_layers = []
         for _ in range(num_encoder_layers):
             encoder_layers.append(
@@ -237,150 +238,57 @@ class CellMatesEncoderLayer(nn.Module):
         return self.dropout2(x)
 
 
-class SpatialAttentionHead(nn.Module):
-    """
-    This class represents an attention head for transformer models.
-    """
-
-    def __init__(self, d_input: int, n_hidden: int):
-        """
-        Initializes the AttentionHead.
-
-        Args:
-            d_input: the dimension of the input
-            n_hidden: the dimension of the keys, queries, and values
-        """
-        super().__init__()
-        self.W_K = nn.Linear(d_input, n_hidden)
-        self.W_Q = nn.Linear(d_input, n_hidden)
-        self.W_V = nn.Linear(d_input, n_hidden)
-        self.n_hidden = n_hidden
-
-    def forward(
-        self, x: torch.Tensor, attn_mask: torch.Tensor | None = None
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Computes the forward pass of the attention head.
-
-        Args:
-            x (torch.Tensor): The input tensor. Shape: (batch_size, seq_length, d_input)
-            attn_mask (Optional[torch.Tensor]): The causal mask tensor. If provided, it acts as an attention mask
-            that determines which tokens in the sequence should be attended to. It's a 3D tensor where the value at
-            position [b, i, j] is 1 if the token at position i in batch b should attend to the token at position j,
-            and 0 otherwise. If not provided (None), ignore it.
-            Shape: (batch_size, seq_length, seq_length)
-
-        Returns:
-            attn_output (torch.Tensor): The output tensor after attention. Shape: (batch_size, seq_length, n_hidden)
-            attn_score (torch.Tensor): The attention score tensor. Shape: (batch_size, seq_length, seq_length)
-        """
-        attn_output, attn_score = None, None
-
-        # ======= Your Code Starts Here ========
-
-        batch_size, n_words, embedding_dim = x.shape
-
-        # compute Q,K,V matrices:
-        Q = self.W_Q(x)
-        K = self.W_K(x)
-        V = self.W_V(x)
-        assert Q.shape == K.shape == V.shape == (batch_size, n_words, self.n_hidden)
-
-        # compute scores:
-        scores = Q @ K.transpose(1, 2) / np.sqrt(self.n_hidden)
-
-        # assign a score of negative infinity to non-attended tokens:
-        if attn_mask is not None:
-            scores = scores.masked_fill_(attn_mask == 0, -float("inf"))
-
-        attn_score = nn.functional.softmax(scores, dim=-1)
-        assert attn_score.shape == (batch_size, n_words, n_words)
-
-        attn_output = attn_score @ V
-
-        # ======= Your Code Ends Here ========
-
-        return attn_output, attn_scor
-
-
-class SpatialMultiheadAttention(nn.Module):
-    def __init__(self, d_input: int, n_hidden: int, num_heads: int):
-        """
-        Initializes the MultiheadAttention.
-
-        Args:
-            d_input (int): The dimension of the input.
-            n_hidden: the hidden dimenstion for the attention layer
-            num_heads (int): The number of attention heads.
-        Attributes:
-            attention_heads (nn.ModuleList): A list of attention heads.
-            W_proj (nn.Linear): A linear layer for projecting the concatenated outputs of the attention heads back
-            to the original dimension.
-        """
-
+class SpatialMultiHeadAttention(nn.Module):
+    def __init__(
+        self,
+        D: int,  # D
+        H: int,  # H
+        K: int,  # K
+        device: str,
+    ) -> None:
         super().__init__()
 
-        # ======= Your Code Starts Here ========
-        self.attention_heads = nn.ModuleList(
-            [SpatialAttentionHead(d_input, n_hidden) for i in range(num_heads)]
-        )
-        self.W_proj = nn.Linear(num_heads * n_hidden, d_input)
+        # save shapes:
+        self.D = D
+        self.H = H
+        self.K = K
 
-        # for tests later:
-        self.d_input = d_input
-        self.n_hidden = n_hidden
-        self.num_heads = num_heads
+        # init multi-head weight matrices:
+        self.Wq = nn.Linear(D, D)
+        self.Wk = nn.Linear(D, D)
+        self.Wv = nn.Linear(D, D)
+        self.Wo = nn.Linear(D, D)
 
-        # ======= Your Code Ends Here ========
+        # init scaler and move to device:
+        self.sqrt_K = torch.FloatTensor([sqrt(K)]).to(device)
 
-    def forward(
-        self, x: torch.Tensor, attn_mask: torch.Tensor | None
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Executes the forward pass of the multi-head attention mechanism.
+    def forward(self, x_BLD):
 
-        Args:
-            x (torch.Tensor): The input tensor. It has a shape of (batch_size, seq_length, d_input).
-            attn_mask (Optional[torch.Tensor]): The attention mask tensor. If provided, it serves as an attention guide
-            that specifies which tokens in the sequence should be attended to. It's a 3D tensor where the value at
-            position [b, i, j] is 1 if the token at position i in batch b should attend to the token at position j,
-            and 0 otherwise. If not provided (None), ignore it.
-            Shape: (batch_size, seq_length, seq_length)
+        # set dims:
+        B, L, D = x_BLD.shape
+        H, K = self.H, self.K
 
-        Returns:
-            attn_output (torch.Tensor): The output tensor after applying multi-head attention. It has a shape of
-            (batch_size, seq_length, d_input).
+        # apply linear layers:
+        Q_BLD = self.Wq(x_BLD)
+        K_BLD = self.Wk(x_BLD)
+        V_BLD = self.Wv(x_BLD)
 
-        This method computes the multi-head attention by looping through each attention head, collecting the outputs,
-        concatenating them together along the hidden dimension, and then projecting them back into the output dimension
-        (d_input). It returns both the final attention outputs as well as the attn_scores from each head.
-        """
-        attn_output, attn_scores = None, None
+        # reshape for separating matmuls per-head:
+        Q_BLHK = Q_BLD.view(B, L, H, K)
+        K_BLHK = K_BLD.view(B, L, H, K)
+        V_BLHK = V_BLD.view(B, L, H, K)
 
-        # ======= Your Code Starts Here ========
-        batch_size, n_words, embedding_dim = x.shape  # for tests
+        # attention scores:
+        E_BHLL = torch.einsum("BLHK,BXHK->BHLX", Q_BLHK, K_BLHK)
+        E_BHLL = E_BHLL / self.sqrt_K
+        E_BHLL = torch.softmax(E_BHLL, dim=-1)
 
-        # run all heads:
-        attn_output_per_head = []
-        attn_scores = []
-        for head in self.attention_heads:
-            o, s = head(x, attn_mask)
-            attn_output_per_head.append(o)
-            attn_scores.append(s)
+        # BHLL,BLHK->BHLK
+        Z_BLHK = torch.einsum("BHLX,BXHK->BLHK", E_BHLL, V_BLHK)
 
-        stacked_attn_output = torch.concat(attn_output_per_head, dim=-1)
-        assert stacked_attn_output.shape == (
-            batch_size,
-            n_words,
-            self.num_heads * self.n_hidden,
-        )
+        # concat all head computations:
+        Z_BLD = Z_BLHK.reshape(B, L, D)
 
-        attn_scores = torch.stack(attn_scores).transpose(0, 1)
-        assert attn_scores.shape == (batch_size, self.num_heads, n_words, n_words)
+        output_BLD = self.Wo(Z_BLD)
 
-        # project:
-        attn_output = self.W_proj(stacked_attn_output)
-        assert attn_output.shape == (batch_size, n_words, self.d_input)
-
-        # ======= Your Code Ends Here ========
-        return attn_output, attn_scores
+        return output_BLD
