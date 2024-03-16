@@ -2,6 +2,7 @@ from typing import Literal, overload
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 
+from cellmates.data.dataset import CellMatesDataset
 from cellmates.data.sample import Sample
 from cellmates.utils import CELL_TYPE_STR_TO_IDX
 from cellmates.cache import persistent_cache
@@ -12,7 +13,7 @@ from tdm.tissue import RazaBreast
 from torch.utils.data import ConcatDataset, Dataset
 
 
-class BreastCancerTissueDataset:
+class BreastCancerTissueDataset(CellMatesDataset):
     def __init__(
         self, tissue_idx: int, effective_distance: int, responder_cell_type: str
     ) -> None:
@@ -44,12 +45,16 @@ class BreastCancerTissueDataset:
 
         # swap the row and column of the target cell to make it first:
         responder_cell_idx = np.argwhere(nearby_cell_idxs == cell_idx).flatten()[0]
+
+        # swap rows:
         distances_to_nearby_cells[[0, responder_cell_idx]] = distances_to_nearby_cells[
             [responder_cell_idx, 0]
-        ]  # swap rows
+        ]
+
+        # swap columns:
         distances_to_nearby_cells[:, [0, responder_cell_idx]] = (
             distances_to_nearby_cells[:, [responder_cell_idx, 0]]
-        )  # swap columns
+        )
 
         # fetch cell types and swap the responder cell's location again:
         df = self.tissue.cell_df()

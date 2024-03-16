@@ -1,3 +1,5 @@
 .venv/
 cellmates.egg-info/
 __pycache__/
+wandb/
+lightning_logs/

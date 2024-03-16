@@ -25,6 +25,7 @@ class Sample:
         self.distances = distances
         self.responder_cell_type = responder_cell_type
         self.is_dividing = is_dividing
+        self.n_cells = len(cell_types)
 
     def __repr__(self) -> str:
         return f"""
