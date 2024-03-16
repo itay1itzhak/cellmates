@@ -24,7 +24,7 @@ RESPONDER_CELL_IDX = 0
 
 
 def bucketize_distances(distances: Tensor):
-    return torch.bucketize(distances, DISTANCE_BINS, right=False)
+    return torch.bucketize(distances, DISTANCE_BINS.to(distances.device), right=False)
 
 
 class CellMatesTransformer(nn.Module):

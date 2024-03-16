@@ -42,7 +42,7 @@ def generate_dataset_for_cell_type() -> CellMatesDataset:
     return CellMatesDataset(samples)
 
 
-def generate_dataset_for_n_cells_test() -> CellMatesDataset:
+def generate_dataset_for_n_cells_test(n=10) -> CellMatesDataset:
     """
     Generates a dataset with 10 tissues, composed of 1-10 identical cells in the middle.
     The number of cells determines division.
@@ -56,5 +56,5 @@ def generate_dataset_for_n_cells_test() -> CellMatesDataset:
             is_dividing=(n_cells % 2 == 0),
         )
 
-    samples = [identical_cell_sample(n) for n in range(10)]
+    samples = [identical_cell_sample(i) for i in range(2, 2 + n)]
     return CellMatesDataset(samples)

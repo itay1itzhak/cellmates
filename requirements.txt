@@ -11,7 +11,6 @@ attrs==23.2.0
 Babel==2.14.0
 beautifulsoup4==4.12.3
 bleach==6.1.0
--e git+ssh://git@github.com/itay1itzhak/cellmates.git@54b4efc5d6e97e3f382df95a88728cff182c302d#egg=cellmates
 certifi==2024.2.2
 cffi==1.16.0
 charset-normalizer==3.3.2
