@@ -18,7 +18,7 @@ from math import sqrt
 # <10 corresponds with direct contact.
 # we assume communication in distances >140 should be equally inneffective
 DISTANCE_BINS = torch.arange(10, 150, 10)
-N_DISTANCES = len(DISTANCE_BINS)
+N_DISTANCES = len(DISTANCE_BINS) + 1
 
 RESPONDER_CELL_IDX = 0
 
@@ -107,9 +107,7 @@ class CellMatesTransformer(nn.Module):
         self.mlp_linear2 = Linear(M, 1, bias=bias, **factory_kwargs)
 
     def forward(
-        self,
-        cell_types_BL: Tensor,
-        distances_BLL: Tensor,
+        self, cell_types_BL: Tensor, distances_BLL: Tensor, padding_mask_BL: Tensor
     ) -> Tensor:
 
         hidden_BLD = self.cell_type_embedding(cell_types_BL)
@@ -118,10 +116,14 @@ class CellMatesTransformer(nn.Module):
 
         # Apply encoder layers with distance embeddings
         for layer in self.encoder_layers:
-            hidden_BLD = layer(hidden_BLD, distance_idxs_BLL, self.distance_embeddings)
+            hidden_BLD = layer(
+                hidden_BLD, distance_idxs_BLL, padding_mask_BL, self.distance_embeddings
+            )
+
+        # Pooling - sum without padding vectors
+        output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
 
         # Apply MLP to the pooled cell-representations:
-        output_BD = hidden_BLD.sum(dim=1)  # TODO - don't sum padding vectors
         output_BM = self.mlp_dropout(F.relu(self.mlp_linear1(output_BD)))
         output_B1 = self.mlp_linear2(output_BM)
 
@@ -177,7 +179,11 @@ class CellMatesEncoderLayer(nn.Module):
         self.activation = activation
 
     def forward(
-        self, x_BLD: Tensor, distance_idxs_BLL: Tensor, distance_embeddings: ModuleDict
+        self,
+        x_BLD: Tensor,
+        distance_idxs_BLL: Tensor,
+        padding_mask_BL: Tensor,
+        distance_embeddings: ModuleDict,
     ) -> Tensor:
         r"""Pass the input through the encoder layer.
 
@@ -196,13 +202,12 @@ class CellMatesEncoderLayer(nn.Module):
         Shape:
             see the docs in Transformer class.
         """
-        key_padding_mask = None
         if self.norm_first:
             x_BLD = x_BLD + self._sa_block(
                 self.norm1(x_BLD),
                 distance_idxs_BLL=distance_idxs_BLL,
                 distance_embeddings=distance_embeddings,
-                key_padding_mask=key_padding_mask,
+                padding_mask_BL=padding_mask_BL,
             )
             x_BLD = x_BLD + self._ff_block(self.norm2(x_BLD))
         else:
@@ -212,7 +217,7 @@ class CellMatesEncoderLayer(nn.Module):
                     x_BLD,
                     distance_idxs_BLL=distance_idxs_BLL,
                     distance_embeddings=distance_embeddings,
-                    key_padding_mask=key_padding_mask,
+                    padding_mask_BL=padding_mask_BL,
                 )
             )
             x_BLD = self.norm2(x_BLD + self._ff_block(x_BLD))
@@ -225,13 +230,13 @@ class CellMatesEncoderLayer(nn.Module):
         x_BLD: Tensor,
         distance_idxs_BLL: Tensor,
         distance_embeddings: ModuleDict,
-        key_padding_mask: Tensor | None = None,
+        padding_mask_BL: Tensor | None = None,
     ) -> Tensor:
         x = self.attn(
             x_BLD,
             distance_idxs_BLL,
             distance_embeddings,
-            key_padding_mask=key_padding_mask,  # for differenet length batches
+            padding_mask_BL=padding_mask_BL,  # for differenet length batches
         )
         return self.dropout1(x)
 
@@ -270,7 +275,7 @@ class SpatialMultiHeadAttention(nn.Module):
         x_BLD: Tensor,
         distance_idxs_BLL: Tensor,
         distance_embeddings: ModuleDict,
-        key_padding_mask: Tensor | None = None,
+        padding_mask_BL: Tensor | None = None,
     ):
 
         # set dims:
@@ -311,6 +316,11 @@ class SpatialMultiHeadAttention(nn.Module):
 
         # sum:
         E_BHLL = E_BHLL + Eqk_BHLL + Eqr_BHLL + Ekr_BHLL
+
+        # -inf score for padding vectors:
+        padding_mask_BHLL = padding_mask_BL.repeat(1, H, 1, L).reshape((B, H, L, L))
+        E_BHLL.masked_fill_(padding_mask_BHLL == 0, -float("inf"))
+
         E_BHLL = torch.softmax(E_BHLL, dim=-1)
 
         """

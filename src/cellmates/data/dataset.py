@@ -33,11 +33,11 @@ def collate_fn(samples):
     L = max([s.n_cells for s in samples])
 
     # initialize zero tensors with final batch shape:
-    cell_types_BL = torch.zeros((B, L))
-    distances_BLL = torch.zeros((B, L, L))
-    responder_cell_type_B = torch.zeros((B, L))
-    is_dividing_B = torch.zeros((B, L))
-    padding_mask_BL = torch.zeros((B, L))
+    cell_types_BL = torch.zeros((B, L), dtype=int)
+    distances_BLL = torch.zeros((B, L, L), dtype=int)
+    responder_cell_type_B = torch.zeros((B, L), dtype=int)
+    is_dividing_B = torch.zeros((B, L), dtype=int)
+    padding_mask_BL = torch.zeros((B, L), dtype=torch.float32)  # TODO 32 or 64?
 
     # write samples into the zero tensors:
     for i, sample in enumerate(samples):

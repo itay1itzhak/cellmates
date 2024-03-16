@@ -1,5 +1,6 @@
 from cellmates.model.transformer import bucketize_distances
 import pytest
+import torch
 
 
 @pytest.mark.parametrize(
@@ -20,4 +21,5 @@ import pytest
 )
 def test_distance_discretization(distance, bin_idx):
     """"""
-    assert bucketize_distances(distance) == bin_idx
+    distance_tensor = torch.tensor([distance])
+    assert bucketize_distances(distance_tensor)[0] == bin_idx
