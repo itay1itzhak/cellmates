@@ -23,19 +23,28 @@ def single_sample():
 
 @pytest.fixture
 def model_config():
+
+    # TODO add - if torch.cuda.is_available(): device = "cuda:0"
+    if torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+
     model_config = {
         "D": 512,
         "H": 16,
         "K": 32,
-        "F": 2048,
+        "F": 1024,
         "M": 512,
         "n_cell_types": 6,
-        "num_encoder_layers": 8,
+        "num_encoder_layers": 4,
         "dropout_p": 0.1,
         "activation": torch.relu,
         "layer_norm_eps": 1e-5,
         "batch_first": True,
         "norm_first": True,
         "bias": True,
+        "device": device,
+        "use_wandb": True,
     }
     return model_config

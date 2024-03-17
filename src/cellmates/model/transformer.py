@@ -316,7 +316,7 @@ class SpatialMultiHeadAttention(nn.Module):
 
         # sum and normalize:
         E_BHLL = E_BHLL + Eqk_BHLL + Eqr_BHLL + Ekr_BHLL
-        E_BHLL = E_BHLL / self.sqrt_K
+        E_BHLL = E_BHLL / (2 * self.sqrt_K)
 
         # -inf score for padding vectors:
         padding_mask_BHLL = padding_mask_BL.repeat(1, H, 1, L).reshape((B, H, L, L))

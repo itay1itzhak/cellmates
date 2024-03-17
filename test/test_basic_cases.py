@@ -10,116 +10,69 @@ from cellmates.data.stubs import (
 from cellmates.train import train_model
 from cellmates.data.dataset import collate_fn
 
+import pandas as pd
+import pytest
 
-def test_distances_influence(model_config):
+
+@pytest.mark.parametrize(
+    "load_dataset_func, n_steps, learning_rate, num_encoder_layers",
+    [
+        (generate_dataset_for_distances, 20, 1e-3, 4),
+        (generate_dataset_for_cell_type, 20, 1e-3, 4),
+        (generate_dataset_for_n_cells_test, 40, 1e-3, 4),
+    ],
+)
+def test_toy_dataset(
+    model_config, load_dataset_func, n_steps, learning_rate, num_encoder_layers
+):
     """
     Tests that the model correctly learns the relationship between cell distances and division.
     """
-    test_dataset = generate_dataset_for_distances()
+    test_dataset = load_dataset_func()
+
+    model_config["num_encoder_layers"] = num_encoder_layers
 
     trained_model = train_model(
         train_dataset=test_dataset,
         valid_dataset=test_dataset,
-        num_epochs=20,
-        batch_size=1,  # len(test_dataset),
+        num_epochs=n_steps,
+        batch_size=len(test_dataset),
         **model_config,
+        learning_rate=learning_rate
     )
     test_dataloader = DataLoader(
         test_dataset, batch_size=len(test_dataset), collate_fn=collate_fn
     )
-    cell_types_BL, distances_BLL, target = next(iter(test_dataloader))
 
-    output_B1 = trained_model(cell_types_BL, distances_BLL)
+    # move test batch to model device:
+    device = model_config["device"]
+    batch = next(iter(test_dataloader))
+    batch = {k: v.to(device) for k, v in batch.items()}
 
-    # print the output with context
-    print(f"test_distances_influence predictions:\n{torch.sigmoid(output_B1)}")
-    print(f"test_distances_influence target:\n{target}")
+    # fetch batch components:
+    cell_types_BL = batch["cell_types_BL"]
+    distances_BLL = batch["distances_BLL"]
+    target = batch["is_dividing_B"]
+    padding_mask_BL = batch["padding_mask_BL"]
+
+    # compute final output:
+    trained_model.to(device).eval()  # disables dropout
+    output_B1 = trained_model(
+        cell_types_BL=cell_types_BL,
+        distances_BLL=distances_BLL,
+        padding_mask_BL=padding_mask_BL,
+    )
+
+    model_probs = torch.sigmoid(output_B1).squeeze()
+
+    print(
+        pd.DataFrame(
+            {
+                "model_probs": model_probs.cpu().detach().numpy().round(3),
+                "true_label": target.cpu().numpy(),
+            }
+        )
+    )
 
     # Output should match targets closely
-    assert torch.all(torch.isclose(torch.sigmoid(output_B1), target.float(), atol=0.05))
-
-
-def test_cell_type_influence(model_config):
-    """
-    Tests that the model correctly learns the relationship between cell types and division.
-    """
-    test_dataset = generate_dataset_for_cell_type()
-
-    trained_model = train_model(
-        train_dataset=test_dataset,
-        valid_dataset=test_dataset,
-        num_epochs=10,
-        batch_size=1,  # len(test_dataset),
-        **model_config,
-    )
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=len(test_dataset), collate_fn=collate_fn
-    )
-    cell_types_BL, distances_BLL, target = next(iter(test_dataloader))
-
-    output_B1 = trained_model(cell_types_BL, distances_BLL)
-
-    # print the output with context
-    print(f"test_cell_type_influence predictions:\n{torch.sigmoid(output_B1)}")
-    print(f"test_cell_type_influence target:\n{target}")
-
-    # Output should match targets closely
-    assert torch.all(torch.isclose(torch.sigmoid(output_B1), target.float(), atol=0.05))
-
-
-def test_n_cells_influence(model_config):
-    """
-    Tests that the model correctly learns the relationship between the number of cells and division.
-    """
-    test_dataset = generate_dataset_for_n_cells_test(5)
-
-    trained_model = train_model(
-        train_dataset=test_dataset,
-        valid_dataset=test_dataset,
-        num_epochs=40,  # 20,
-        batch_size=1,  # len(test_dataset),
-        **model_config,
-    )
-    test_dataloader = DataLoader(test_dataset, batch_size=1, collate_fn=collate_fn)
-    # cell_types_BL, distances_BLL, target = next(iter(test_dataloader))
-    all_outputs = []
-    all_targets = []
-    for cell_types_BL, distances_BLL, target in test_dataloader:
-        output_B1 = trained_model(cell_types_BL, distances_BLL)
-        all_outputs.append(output_B1)
-        all_targets.append(target)
-
-    output_B1 = torch.cat(all_outputs, dim=0)
-    target = torch.cat(all_targets, dim=0)
-
-    # print the output with context
-    print(f"test_n_cells_influence predictions:\n{torch.sigmoid(output_B1)}")
-    print(f"test_n_cells_influence target:\n{target}")
-
-    # Output should match targets closely
-    assert torch.all(torch.isclose(torch.sigmoid(output_B1), target.float(), atol=0.05))
-
-
-# run the tests without pytest for debugging
-# model_config = {
-#     "D": 512,
-#     "H": 16,
-#     "K": 32,
-#     "F": 2048,
-#     "M": 512,
-#     "n_cell_types": 6,
-#     "num_encoder_layers": 8,
-#     "dropout_p": 0.1,
-#     "activation": torch.relu,
-#     "layer_norm_eps": 1e-5,
-#     "batch_first": True,
-#     "norm_first": True,
-#     "bias": True,
-#     "wandb": True,
-#     "experiment_name": "test_distances_influence",
-# }
-# test_distances_influence(model_config)
-# model_config["experiment_name"] = "test_cell_type_influence"
-# test_cell_type_influence(model_config)
-# model_config["experiment_name"] = "test_n_cells_influence"
-# test_n_cells_influence(model_config)
+    assert torch.all(torch.isclose(model_probs, target.float(), atol=0.01))

@@ -30,9 +30,11 @@ def train_model(
     norm_first: bool = False,
     bias: bool = True,
     checkpoint_path: str = None,
-    wandb: bool = False,
+    use_wandb: bool = False,
     save_checkpoint: bool = False,
     experiment_name: str = "cellmates",
+    device: str | None = None,
+    learning_rate: float = 1e-3,
 ):
     """Train a CellMatesTransformer model.
 
@@ -58,6 +60,8 @@ def train_model(
         wandb (bool, optional): _description_. Defaults to False.
         save_checkpoint (bool, optional): _description_. Defaults to False.
         experiment_name (str, optional): _description_. Defaults to "cellmates".
+        device (str | None, optional): _description_. Defaults to None.
+        learning_rate (float, optional): _description_. Defaults to 1e-3.
 
     Returns:
         _type_: _description_
@@ -92,7 +96,9 @@ def train_model(
             "batch_first": batch_first,
             "norm_first": norm_first,
             "bias": bias,
-        }
+            "device": device,
+        },
+        learning_rate=learning_rate,
     )
 
     # Load from checkpoint if provided
@@ -139,7 +145,7 @@ def train_model(
         callbacks = None
 
     # Define PyTorch Lightning trainer
-    if wandb:
+    if use_wandb:
         trainer = pl.Trainer(
             max_epochs=num_epochs,
             logger=[wandb_logger],

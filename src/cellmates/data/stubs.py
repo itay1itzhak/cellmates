@@ -53,7 +53,7 @@ def generate_dataset_for_n_cells_test(n=10) -> CellMatesDataset:
             cell_types=np.repeat(1, n_cells),
             distances=torch.zeros((n_cells, n_cells)),
             responder_cell_type=1,
-            is_dividing=(n_cells % 2 == 0),
+            is_dividing=(n_cells > 5),
         )
 
     samples = [identical_cell_sample(i) for i in range(2, 2 + n)]
