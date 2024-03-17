@@ -12,10 +12,8 @@ from cellmates.model.LightningCellMates import LightningCellMates
 
 
 def train_model(
-    train_dataset: CellMatesDataset = None,
-    valid_dataset: CellMatesDataset = None,
-    train_dataset_path: str = None,
-    valid_dataset_path: str = None,
+    train_dataset: CellMatesDataset | str,
+    valid_dataset: CellMatesDataset | str,
     batch_size: int = 32,
     num_epochs: int = 100,
     D: int = 512,
@@ -36,17 +34,41 @@ def train_model(
     save_checkpoint: bool = False,
     experiment_name: str = "cellmates",
 ):
+    """Train a CellMatesTransformer model.
 
-    # Load datasets if not provided
-    if train_dataset is None and train_dataset_path is None:
-        raise ValueError("train_dataset or train_dataset_path must be provided")
-    if valid_dataset is None and valid_dataset_path is None:
-        raise ValueError("valid_dataset or valid_dataset_path must be provided")
-    if train_dataset is None:  # load dataset from path
-        train_dataset = CellMatesDataset.load(train_dataset_path)
-    if valid_dataset is None:  # load dataset from path
-        valid_dataset = CellMatesDataset.load(valid_dataset_path)
+    Args:
+        train_dataset (CellMatesDataset | str): An instance of CellMatesDataset or a path to a saved CellMatesDataset.
+        valid_dataset (CellMatesDataset | str): _description_
+        batch_size (int, optional): _description_. Defaults to 32.
+        num_epochs (int, optional): _description_. Defaults to 100.
+        D (int, optional): model dimension (cell-type embedding dimension). Defaults to 512.
+        H (int, optional): number of attention heads in a layer. Defaults to 16.
+        K (int, optional): size of each attention key or value (also dimension of distance embeddings). Defaults to 512.
+        F (int, optional): feedfoward subnetwork hidden size. Defaults to 2048.
+        M (int, optional): mlp hidden size. Defaults to 512.
+        n_cell_types (int, optional): _description_. Defaults to 6.
+        num_encoder_layers (int, optional): _description_. Defaults to 8.
+        dropout_p (float, optional): _description_. Defaults to 0.1.
+        activation (str, optional): _description_. Defaults to "relu".
+        layer_norm_eps (float, optional): _description_. Defaults to 1e-5.
+        batch_first (bool, optional): _description_. Defaults to True.
+        norm_first (bool, optional): _description_. Defaults to False.
+        bias (bool, optional): _description_. Defaults to True.
+        checkpoint_path (str, optional): _description_. Defaults to None.
+        wandb (bool, optional): _description_. Defaults to False.
+        save_checkpoint (bool, optional): _description_. Defaults to False.
+        experiment_name (str, optional): _description_. Defaults to "cellmates".
 
+    Returns:
+        _type_: _description_
+    """
+    # load datasets if paths were provided
+    if type(train_dataset) is str:
+        train_dataset = CellMatesDataset.load(train_dataset)
+    if type(valid_dataset) is str:
+        valid_dataset = CellMatesDataset.load(valid_dataset)
+
+    # init dataloaders:
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, collate_fn=collate_fn, shuffle=True
     )
@@ -74,17 +96,8 @@ def train_model(
     )
 
     # Load from checkpoint if provided
-    if checkpoint_path is not None and os.path.isfile(checkpoint_path):
+    if checkpoint_path:
         model.load_from_checkpoint(checkpoint_path)
-
-    # Create callback for model checkpointing
-    checkpoint_callback = ModelCheckpoint(
-        monitor="val_loss",
-        dirpath="checkpoints",
-        filename="cellmates-{experiment_name}" + "-{epoch:02d}-{val_loss:.2f}",
-        save_top_k=3,
-        mode="min",
-    )
 
     # Create loggers (both Weights&Biases and local CSV file)
     wandb_logger = WandbLogger(
@@ -111,8 +124,16 @@ def train_model(
             "num_epochs": num_epochs,
         }
     )
-    # Save the model checkpoint
+
+    # init callbacks:
     if save_checkpoint:
+        checkpoint_callback = ModelCheckpoint(
+            monitor="val_loss",
+            dirpath="checkpoints",
+            filename="cellmates-{experiment_name}" + "-{epoch:02d}-{val_loss:.2f}",
+            save_top_k=3,
+            mode="min",
+        )
         callbacks = [checkpoint_callback]
     else:
         callbacks = None
