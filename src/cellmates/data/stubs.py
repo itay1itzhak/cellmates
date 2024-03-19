@@ -56,5 +56,5 @@ def generate_dataset_for_n_cells_test(n=10) -> CellMatesDataset:
             is_dividing=(n_cells > 5),
         )
 
-    samples = [identical_cell_sample(i) for i in range(2, 2 + n)]
+    samples = [identical_cell_sample(i) for i in [2, 2, 2, 10, 10, 10]]
     return CellMatesDataset(samples)

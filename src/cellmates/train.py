@@ -105,32 +105,6 @@ def train_model(
     if checkpoint_path:
         model.load_from_checkpoint(checkpoint_path)
 
-    # Create loggers (both Weights&Biases and local CSV file)
-    wandb_logger = WandbLogger(
-        name=f"cellmates_train-{experiment_name}", project="cellmates"
-    )
-
-    # log train loss
-    wandb_logger.log_hyperparams(
-        {
-            "D": D,
-            "H": H,
-            "K": K,
-            "F": F,
-            "M": M,
-            "n_cell_types": n_cell_types,
-            "num_encoder_layers": num_encoder_layers,
-            "dropout_p": dropout_p,
-            "activation": activation,
-            "layer_norm_eps": layer_norm_eps,
-            "batch_first": batch_first,
-            "norm_first": norm_first,
-            "bias": bias,
-            "batch_size": batch_size,
-            "num_epochs": num_epochs,
-        }
-    )
-
     # init callbacks:
     if save_checkpoint:
         checkpoint_callback = ModelCheckpoint(
@@ -146,6 +120,32 @@ def train_model(
 
     # Define PyTorch Lightning trainer
     if use_wandb:
+        # Create loggers (both Weights&Biases and local CSV file)
+        wandb_logger = WandbLogger(
+            name=f"cellmates_train-{experiment_name}", project="cellmates"
+        )
+
+        # log train loss
+        wandb_logger.log_hyperparams(
+            {
+                "D": D,
+                "H": H,
+                "K": K,
+                "F": F,
+                "M": M,
+                "n_cell_types": n_cell_types,
+                "num_encoder_layers": num_encoder_layers,
+                "dropout_p": dropout_p,
+                "activation": activation,
+                "layer_norm_eps": layer_norm_eps,
+                "batch_first": batch_first,
+                "norm_first": norm_first,
+                "bias": bias,
+                "batch_size": batch_size,
+                "num_epochs": num_epochs,
+            }
+        )
+
         trainer = pl.Trainer(
             max_epochs=num_epochs,
             logger=[wandb_logger],

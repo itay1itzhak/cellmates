@@ -120,7 +120,7 @@ class CellMatesTransformer(nn.Module):
                 hidden_BLD, distance_idxs_BLL, padding_mask_BL, self.distance_embeddings
             )
 
-        # Pooling - sum without padding vectors
+        # pooling - sum without padding vectors
         output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
 
         # Apply MLP to the pooled cell-representations:
