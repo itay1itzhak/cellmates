@@ -24,10 +24,22 @@ def test_single_instance_overfit(single_sample, model_config):
     single_instance_loader = DataLoader(
         single_instance_dataset, batch_size=1, collate_fn=collate_fn
     )
-    cell_types_BL, distances_BLL, target = next(iter(single_instance_loader))
+
+    batch = next(iter(single_instance_loader))
+
+    # fetch batch components:
+    cell_types_BL = batch["cell_types_BL"]
+    distances_BLL = batch["distances_BLL"]
+    target = batch["is_dividing_B"]
+    padding_mask_BL = batch["padding_mask_BL"]
 
     # Test that we are reasonably close to 100% accuracy
-    output_B1 = trained_model(cell_types_BL, distances_BLL)
+    trained_model.eval()
+    output_B1 = trained_model(
+        cell_types_BL=cell_types_BL,
+        distances_BLL=distances_BLL,
+        padding_mask_BL=padding_mask_BL,
+    )
 
     # print the output with context
     print(f"test_single_instance_overfit accuracy: {torch.sigmoid(output_B1).item()}")

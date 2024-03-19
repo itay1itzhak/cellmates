@@ -42,19 +42,22 @@ def generate_dataset_for_cell_type() -> CellMatesDataset:
     return CellMatesDataset(samples)
 
 
-def repeated_cell_sample(n_cells: int) -> Sample:
+def repeated_cell_sample(n_cells: int, threshold: int = 5) -> Sample:
     return Sample(
         cell_types=np.repeat(1, n_cells),
         distances=torch.zeros((n_cells, n_cells)),
         responder_cell_type=1,
-        is_dividing=(n_cells > 50),
+        is_dividing=(n_cells > threshold),
     )
 
 
-def generate_dataset_for_n_cells_test(n=10) -> CellMatesDataset:
+def generate_dataset_for_n_cells_test(n=10, step=1) -> CellMatesDataset:
     """
     Generates a dataset with 10 tissues, composed of 1-10 identical cells in the middle.
     The number of cells determines division.
     """
-    samples = [repeated_cell_sample(i) for i in range(0, n * 10, 10)]
+    samples = [
+        repeated_cell_sample(i, threshold=(n - 1) * step / 2)
+        for i in range(0, n * step, step)
+    ]
     return CellMatesDataset(samples)

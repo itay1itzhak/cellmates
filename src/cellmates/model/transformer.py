@@ -19,14 +19,16 @@ import numpy as np  # for debugging
 # bins: <10, [10,20), ... [130,140), [140,infty)
 # <10 corresponds with direct contact.
 # we assume communication in distances >140 should be equally inneffective
-DISTANCE_BINS = torch.arange(10, 150, 10)
+DISTANCE_BINS = torch.arange(0, 150, 10)  # TODO fix bucketize test
 N_DISTANCES = len(DISTANCE_BINS) + 1
 
 RESPONDER_CELL_IDX = 0
 
 
 def bucketize_distances(distances: Tensor):
-    return torch.bucketize(distances, DISTANCE_BINS.to(distances.device), right=False)
+    return (
+        torch.bucketize(distances, DISTANCE_BINS.to(distances.device), right=True) - 1
+    ) % 16
 
 
 class CellMatesTransformer(nn.Module):
@@ -104,7 +106,7 @@ class CellMatesTransformer(nn.Module):
             )
         self.encoder_layers = ModuleList(encoder_layers)
 
-        self.C = nn.Parameter(torch.tensor([5.0]))
+        # self.C = nn.Parameter(torch.tensor([5.0]))
 
         # MLP computes a single probability from pooled cell-representations:
         self.mlp_linear1 = Linear(D, M, bias=bias, **factory_kwargs)
@@ -126,9 +128,10 @@ class CellMatesTransformer(nn.Module):
             )
 
         # pooling - sum without padding vectors
-        output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
-        output_BD = torch.sigmoid(output_BD)
+        # output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
+        # output_BD = torch.sigmoid(output_BD)
         # output_BD = output_BD / self.C
+        output_BD = hidden_BLD[:, 0, :]  # special cell type
 
         # Apply MLP to the pooled cell-representations:
         output_BM = self.mlp_dropout(F.relu(self.mlp_linear1(output_BD)))

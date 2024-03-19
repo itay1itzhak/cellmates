@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset
 from cellmates.data.sample import Sample
 import torch
+import numpy as np
 
 
 class CellMatesDataset(Dataset):
@@ -20,6 +21,31 @@ class CellMatesDataset(Dataset):
         return torch.load(path)
 
 
+SPECIAL_CELL_TYPE = 0
+
+
+class AddClassificationCellSample(Sample):
+    def __init__(self, sample: Sample) -> None:
+        self.cell_types = self._cell_types(sample)
+        self.distances = self._distances(sample)
+        self.responder_cell_type = sample.responder_cell_type
+        self.is_dividing = sample.is_dividing
+        self.L = 1 + sample.L
+
+    def _cell_types(self, sample: Sample) -> np.ndarray:
+        return np.concatenate([[SPECIAL_CELL_TYPE], sample.cell_types])
+
+    def _distances(self, sample: Sample) -> np.ndarray:
+        L = sample.L
+        distances = -1 * np.ones((L + 1, L + 1))
+        distances[1:, 1:] = sample.distances
+        return distances
+
+
+def add_classification_cell_type(samples: list[Sample]) -> list[Sample]:
+    return [AddClassificationCellSample(sample) for sample in samples]
+
+
 def collate_fn(samples):
     """
     Collate samples.
@@ -28,9 +54,12 @@ def collate_fn(samples):
         - Initialize a padding matrix of shape BL with
           ones up to the number of cells of each sample.
     """
+
+    samples = add_classification_cell_type(samples)
+
     # batch dimensions:
     B = len(samples)
-    L = max([s.n_cells for s in samples])
+    L = max([s.L for s in samples])
 
     # initialize batch with zero tensors:
     batch = {
@@ -46,7 +75,7 @@ def collate_fn(samples):
     for i, sample in enumerate(samples):
 
         # sample sequence length
-        _L = sample.n_cells
+        _L = sample.L
 
         # write:
         batch["cell_types_BL"][i, :_L] = torch.Tensor(sample.cell_types)
