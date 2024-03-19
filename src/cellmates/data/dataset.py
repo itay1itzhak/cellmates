@@ -37,7 +37,9 @@ class AddClassificationCellSample(Sample):
 
     def _distances(self, sample: Sample) -> np.ndarray:
         L = sample.L
-        distances = -1 * np.ones((L + 1, L + 1))
+        distances = np.zeros((L + 1, L + 1))
+        distances[0, 1:] = sample.distances[0, :]
+        distances[1:, 0] = sample.distances[:, 0]
         distances[1:, 1:] = sample.distances
         return distances
 

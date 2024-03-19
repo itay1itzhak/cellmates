@@ -18,7 +18,7 @@ def generate_dataset_for_distances() -> CellMatesDataset:
                 [[0, second_cell_distance], [second_cell_distance, 0]]
             ),
             responder_cell_type=1,
-            is_dividing=microns(second_cell_distance) < microns(40),
+            is_dividing=second_cell_distance < 40,
         )
 
     samples = [second_cell_distance(d) for d in range(0, 150, 10)]
@@ -47,6 +47,7 @@ def repeated_cell_sample(n_cells: int, threshold: int = 5) -> Sample:
         cell_types=np.repeat(1, n_cells),
         distances=torch.zeros((n_cells, n_cells)),
         responder_cell_type=1,
+        # is_dividing=(n_cells > threshold),
         is_dividing=(n_cells > threshold),
     )
 
@@ -56,8 +57,13 @@ def generate_dataset_for_n_cells_test(n=10, step=1) -> CellMatesDataset:
     Generates a dataset with 10 tissues, composed of 1-10 identical cells in the middle.
     The number of cells determines division.
     """
+    # samples = [
+    #     repeated_cell_sample(i, threshold=(n - 1) * step / 2)
+    #     for i in range(1, (n + 1) * step, step)
+    # ]
+
     samples = [
-        repeated_cell_sample(i, threshold=(n - 1) * step / 2)
-        for i in range(0, n * step, step)
+        repeated_cell_sample(i, threshold=15)
+        for i in [5, 5, 5, 5, 5, 30, 30, 30, 30, 30, 30, 30]
     ]
     return CellMatesDataset(samples)

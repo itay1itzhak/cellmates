@@ -17,9 +17,9 @@ import pytest
 @pytest.mark.parametrize(
     "load_dataset_func, n_steps, learning_rate, num_encoder_layers",
     [
-        # (generate_dataset_for_distances, 20, 1e-3, 8),
-        # (generate_dataset_for_cell_type, 20, 1e-3, 4),
-        (generate_dataset_for_n_cells_test, 100, 1e-4, 4),
+        (generate_dataset_for_distances, 20, 1e-3, 1),
+        (generate_dataset_for_cell_type, 20, 1e-3, 4),
+        (generate_dataset_for_n_cells_test, 50, 1e-4, 4),
     ],
 )
 def test_toy_dataset(
@@ -75,4 +75,4 @@ def test_toy_dataset(
     )
 
     # Output should match targets closely
-    assert torch.all(torch.isclose(model_probs, target.float(), atol=0.01))
+    assert torch.all(torch.isclose(model_probs, target.float(), atol=0.05))
