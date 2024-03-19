@@ -131,7 +131,7 @@ class CellMatesTransformer(nn.Module):
         # output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
         # output_BD = torch.sigmoid(output_BD)
         # output_BD = output_BD / self.C
-        output_BD = hidden_BLD[:, 0, :]  # special cell type
+        output_BD = torch.mean(hidden_BLD[:, :2, :], dim=1)  # special cell type
 
         # Apply MLP to the pooled cell-representations:
         output_BM = self.mlp_dropout(F.relu(self.mlp_linear1(output_BD)))
