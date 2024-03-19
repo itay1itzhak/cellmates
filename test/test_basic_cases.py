@@ -19,7 +19,7 @@ import pytest
     [
         # (generate_dataset_for_distances, 20, 1e-3, 4),
         # (generate_dataset_for_cell_type, 20, 1e-3, 4),
-        (generate_dataset_for_n_cells_test, 20, 1e-3, 4),
+        (generate_dataset_for_n_cells_test, 100, 1e-3, 0),
     ],
 )
 def test_toy_dataset(

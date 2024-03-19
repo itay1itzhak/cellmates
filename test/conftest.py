@@ -45,6 +45,6 @@ def model_config():
         "norm_first": True,
         "bias": True,
         "device": device,
-        "use_wandb": False,
+        "use_wandb": True,
     }
     return model_config

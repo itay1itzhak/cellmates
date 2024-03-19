@@ -12,6 +12,8 @@ from torch.nn import (
 from typing import Callable
 from math import sqrt
 
+import numpy as np  # for debugging
+
 
 # We discretize distances in jumps of 10 microns.
 # bins: <10, [10,20), ... [130,140), [140,infty)
@@ -62,6 +64,7 @@ class CellMatesTransformer(nn.Module):
         dtype=None,
     ) -> None:
         """_summary_"""
+        torch.manual_seed(42)
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
 
@@ -101,6 +104,8 @@ class CellMatesTransformer(nn.Module):
             )
         self.encoder_layers = ModuleList(encoder_layers)
 
+        self.C = nn.Parameter(torch.tensor([5.0]))
+
         # MLP computes a single probability from pooled cell-representations:
         self.mlp_linear1 = Linear(D, M, bias=bias, **factory_kwargs)
         self.mlp_dropout = Dropout(dropout_p)
@@ -122,6 +127,8 @@ class CellMatesTransformer(nn.Module):
 
         # pooling - sum without padding vectors
         output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
+        output_BD = torch.sigmoid(output_BD)
+        # output_BD = output_BD / self.C
 
         # Apply MLP to the pooled cell-representations:
         output_BM = self.mlp_dropout(F.relu(self.mlp_linear1(output_BD)))
@@ -163,7 +170,7 @@ class CellMatesEncoderLayer(nn.Module):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
 
-        self.attn = SpatialMultiHeadAttention(D, H, K, device)
+        self.attn = SpatialMultiHeadAttention(D=D, H=H, K=K, device=device)
 
         # Implementation of Feedforward model
         self.linear1 = Linear(D, F, bias=bias, **factory_kwargs)
@@ -297,7 +304,7 @@ class SpatialMultiHeadAttention(nn.Module):
         """
         # 1 - vanilla:
         E_BHLL = torch.einsum("BLHK,BXHK->BHLX", Q_BLHK, K_BLHK)
-        E_BHLL = E_BHLL
+        E_BHLL = E_BHLL  # TODO what happened here?
 
         # 2 - qk distances:
         Kqk_BLLK = distance_embeddings["Kqk"](distance_idxs_BLL)
@@ -315,11 +322,13 @@ class SpatialMultiHeadAttention(nn.Module):
         Ekr_BHLL = torch.einsum("BLHK,BXK -> BHLX", Q_BLHK, Kkr_BLK)
 
         # sum and normalize:
-        E_BHLL = E_BHLL + Eqk_BHLL + Eqr_BHLL + Ekr_BHLL
+        E_BHLL = E_BHLL + Eqk_BHLL + Eqr_BHLL + Ekr_BHLL  # TODO WTF!!!
         E_BHLL = E_BHLL / (2 * self.sqrt_K)
 
         # -inf score for padding vectors:
-        padding_mask_BHLL = padding_mask_BL.repeat(1, H, 1, L).reshape((B, H, L, L))
+        padding_mask_BHLL = (
+            padding_mask_BL.unsqueeze(1).repeat(1, L, 1).unsqueeze(1).repeat(1, H, 1, 1)
+        )
         E_BHLL.masked_fill_(padding_mask_BHLL == 0, -float("inf"))
 
         E_BHLL = torch.softmax(E_BHLL, dim=-1)
