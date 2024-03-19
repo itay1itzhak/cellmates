@@ -173,5 +173,5 @@ def _get_datasets(responder_cell_type: str, effective_distance: int):
             effective_distance=effective_distance,
             responder_cell_type=responder_cell_type,
         )
-        for idx in all_image_numbers()[:10]
+        for idx in all_image_numbers()
     ]
