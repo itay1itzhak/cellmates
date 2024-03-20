@@ -75,4 +75,4 @@ def test_toy_dataset(
     )
 
     # Output should match targets closely
-    assert torch.all(torch.isclose(model_probs, target.float(), atol=0.05))
+    assert torch.all(torch.isclose(model_probs, target.float(), atol=0.01))
