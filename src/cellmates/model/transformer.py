@@ -129,7 +129,14 @@ class CellMatesTransformer(nn.Module):
 
         # pooling - sum without padding vectors
         # output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
-        output_BD = torch.mean(hidden_BLD[:, :2, :], dim=1)  # special cell type
+
+        # mean of special vector and target cell:
+        # output_BD = torch.mean(hidden_BLD[:, :2, :], dim=1)  # special cell type
+
+        # test:
+        output_BD = hidden_BLD[:, 0, :] + torch.mean(
+            hidden_BLD[:, 1:, :], dim=1
+        )  # special cell type + mean of real cells
 
         # Apply MLP to the pooled cell-representations:
         output_BM = self.mlp_dropout(F.relu(self.mlp_linear1(output_BD)))
