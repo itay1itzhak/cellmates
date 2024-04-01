@@ -9,28 +9,29 @@ from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from cellmates.data.sample import Sample
 from cellmates.data.dataset import CellMatesDataset, collate_fn
 from cellmates.model.LightningCellMates import LightningCellMates
+from cellmates.utils import N_CELL_TYPES
 
 
 def train_model(
-    train_dataset: CellMatesDataset | str,
-    valid_dataset: CellMatesDataset | str,
+    train_ds: CellMatesDataset | str,
+    val_ds: CellMatesDataset | str,
     batch_size: int = 32,
-    num_epochs: int = 100,
+    n_epochs: int = 100,
     D: int = 512,
     H: int = 16,
     K: int = 512,
     F: int = 2048,
     M: int = 512,
-    n_cell_types: int = 6,
+    n_cell_types: int = N_CELL_TYPES,
     num_encoder_layers: int = 8,
     dropout_p: float = 0.1,
     activation: str = "relu",
     layer_norm_eps: float = 1e-5,
     batch_first: bool = True,
-    norm_first: bool = False,
+    norm_first: bool = True,
     bias: bool = True,
     checkpoint_path: str = None,
-    use_wandb: bool = False,
+    use_wandb: bool = True,
     save_checkpoint: bool = False,
     experiment_name: str = "cellmates",
     device: str | None = None,
@@ -70,17 +71,17 @@ def train_model(
     pl.seed_everything(seed=42)
 
     # load datasets if paths were provided
-    if type(train_dataset) is str:
-        train_dataset = CellMatesDataset.load(train_dataset)
-    if type(valid_dataset) is str:
-        valid_dataset = CellMatesDataset.load(valid_dataset)
+    if type(train_ds) is str:
+        train_ds = CellMatesDataset.load(train_ds)
+    if type(val_ds) is str:
+        val_ds = CellMatesDataset.load(val_ds)
 
     # init dataloaders:
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, collate_fn=collate_fn, shuffle=True, num_workers=num_workers
+        train_ds, batch_size=batch_size, collate_fn=collate_fn, shuffle=True, num_workers=num_workers
     )
     valid_loader = DataLoader(
-        valid_dataset, batch_size=batch_size, collate_fn=collate_fn, num_workers=num_workers
+        val_ds, batch_size=batch_size, collate_fn=collate_fn, num_workers=num_workers
     )
 
     # Initialize the Model
@@ -146,17 +147,16 @@ def train_model(
                 "norm_first": norm_first,
                 "bias": bias,
                 "batch_size": batch_size,
-                "num_epochs": num_epochs,
+                "num_epochs": n_epochs,
             }
         )
     
     trainer = pl.Trainer(
-        max_epochs=num_epochs,
+        max_epochs=n_epochs,
         logger=logger,
         callbacks=callbacks,
-        # accelerator="cpu",
-        accelerator="gpu",
-        devices=1,
+        accelerator=device,
+        devices=[2],
     )
 
     # Train the model

@@ -19,5 +19,8 @@ def microns(x: int) -> float:
 # maximal effective communication distance based on euler-yaniv 2023
 MAX_EFFECTIVE_DISTANCE = 140
 
-CELL_TYPE_STR_TO_IDX = {k: i for i, k in enumerate(CELL_TYPES_ARRAY)}
-CELL_TYPE_IDX_TO_STR = {i: k for i, k in enumerate(CELL_TYPES_ARRAY)}
+CELL_TYPE_STR_TO_IDX = {k: i+1 for i, k in enumerate(CELL_TYPES_ARRAY)}
+CELL_TYPE_IDX_TO_STR = {i+1: k for i, k in enumerate(CELL_TYPES_ARRAY)}
+
+
+N_CELL_TYPES = 7 # special cell type + six main types

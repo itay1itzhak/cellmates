@@ -7,6 +7,7 @@ from cellmates.data.stubs import (
     generate_dataset_for_cell_type,
     generate_dataset_for_n_cells_test,
 )
+from cellmates.data.breast import generate_one_tissue_dataset
 from cellmates.train import train_model
 from cellmates.data.dataset import collate_fn
 
@@ -17,9 +18,10 @@ import pytest
 @pytest.mark.parametrize(
     "load_dataset_func, n_steps, learning_rate, num_encoder_layers",
     [
-        (generate_dataset_for_distances, 20, 1e-3, 4),
-        (generate_dataset_for_cell_type, 20, 1e-3, 4),
-        (generate_dataset_for_n_cells_test, 30, 1e-3, 4),
+        # (generate_dataset_for_distances, 20, 1e-3, 4),
+        # (generate_dataset_for_cell_type, 20, 1e-3, 4),
+        # (generate_dataset_for_n_cells_test, 30, 1e-3, 4),
+        (generate_one_tissue_dataset, 100, 1e-3, 1),
     ],
 )
 def test_toy_dataset(
@@ -31,12 +33,13 @@ def test_toy_dataset(
     test_dataset = load_dataset_func()
 
     model_config["num_encoder_layers"] = num_encoder_layers
+    model_config['device'] = 'cuda'
 
     trained_model = train_model(
-        train_dataset=test_dataset,
-        valid_dataset=test_dataset,
-        num_epochs=n_steps,
-        batch_size=len(test_dataset),
+        train_ds=test_dataset,
+        val_ds=test_dataset,
+        n_epochs=n_steps,
+        batch_size=len(test_dataset) // 2,
         **model_config,
         learning_rate=learning_rate
     )

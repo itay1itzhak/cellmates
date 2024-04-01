@@ -11,6 +11,7 @@ from tdm.raw.raza_breast_mibi.utils import all_image_numbers
 from tdm.tissue import RazaBreast
 
 from torch.utils.data import ConcatDataset, Dataset
+from cellmates.utils import MAX_EFFECTIVE_DISTANCE
 
 
 class BreastCancerTissueDataset(CellMatesDataset):
@@ -110,11 +111,11 @@ class BreastCancerTissueDataset(CellMatesDataset):
         # compute x,y masks:
         xys = cell_df[["x", "y"]].to_numpy()
         ds_x, ds_y = xys[:, 0], xys[:, 1]
-        x_is_in_bounds = (ds_x <= x_max - self.effective_distance) & (
-            ds_x >= x_min + self.effective_distance
+        x_is_in_bounds = (ds_x <= (x_max - self.effective_distance)) & (
+            ds_x >= (x_min + self.effective_distance)
         )
-        y_is_in_bounds = (ds_y <= y_max - self.effective_distance) & (
-            ds_y >= y_min + self.effective_distance
+        y_is_in_bounds = (ds_y <= (y_max - self.effective_distance)) & (
+            ds_y >= (y_min + self.effective_distance)
         )
 
         # final mask:
@@ -175,3 +176,16 @@ def _get_datasets(responder_cell_type: str, effective_distance: int):
         )
         for idx in all_image_numbers()
     ]
+
+def generate_one_tissue_dataset() -> CellMatesDataset:
+
+    one_tissue_ds = BreastCancerTissueDataset(
+        tissue_idx=1, 
+        effective_distance=MAX_EFFECTIVE_DISTANCE, 
+        responder_cell_type='F'
+    )
+
+    samples = [s for s in one_tissue_ds]
+
+    return CellMatesDataset(samples)
+

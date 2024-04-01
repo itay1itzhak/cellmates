@@ -13,7 +13,7 @@ from typing import Callable
 from math import sqrt
 
 import numpy as np  # for debugging
-
+from cellmates.utils import N_CELL_TYPES
 
 # We discretize distances in jumps of 10 microns.
 # bins: <10, [10,20), ... [130,140), [140,infty)
@@ -54,7 +54,7 @@ class CellMatesTransformer(nn.Module):
         K: int = 512,
         F: int = 2048,
         M: int = 512,
-        n_cell_types: int = 6,
+        n_cell_types: int = N_CELL_TYPES,
         num_encoder_layers: int = 8,
         dropout_p: float = 0.1,
         activation: str | Callable[[Tensor], Tensor] = F.gelu,

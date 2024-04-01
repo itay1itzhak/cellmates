@@ -1,6 +1,7 @@
 import pytest
 import torch
 from cellmates.data.sample import Sample
+from cellmates.utils import N_CELL_TYPES
 
 
 @pytest.fixture
@@ -27,6 +28,8 @@ def model_config():
     # TODO add - if torch.cuda.is_available(): device = "cuda:0"
     if torch.backends.mps.is_available():
         device = "mps"
+    elif torch.cuda.is_available():
+        device = "cuda"
     else:
         device = "cpu"
 
@@ -36,7 +39,7 @@ def model_config():
         "K": 32,
         "F": 1024,
         "M": 512,
-        "n_cell_types": 6,
+        "n_cell_types": N_CELL_TYPES,
         "num_encoder_layers": 4,
         "dropout_p": 0.1,
         "activation": torch.relu,
@@ -45,6 +48,6 @@ def model_config():
         "norm_first": True,
         "bias": True,
         "device": device,
-        "use_wandb": False,
+        "use_wandb": True,
     }
     return model_config
