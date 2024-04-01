@@ -138,9 +138,9 @@ class CellMatesTransformer(nn.Module):
         # output_BD = torch.mean(hidden_BLD[:, :2, :], dim=1)  # special cell type + first cell
 
         # special cell + mean of cells:
-        L = padding_mask_BL.shape[1] - 1
+        Ls = padding_mask_BL[:, 1:].sum(axis=-1).unsqueeze(-1) # number of (non-padding) cells in each sample
         mean_of_cells = (
-            torch.einsum("BLD,BL->BD", hidden_BLD[:, 1:, :], padding_mask_BL[:, 1:]) / L
+            torch.einsum("BLD,BL->BD", hidden_BLD[:, 1:, :], padding_mask_BL[:, 1:]) / Ls
         )
         output_BD = (hidden_BLD[:, 0, :] + mean_of_cells) / 2
 

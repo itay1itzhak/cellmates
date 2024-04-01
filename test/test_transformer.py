@@ -30,7 +30,7 @@ def test_distance_discretization(distance, bin_idx):
 
 def test_samples_are_independent_wrt_n_cells():
 
-    tr = CellMatesTransformer(D=512, K=int(512 / 16), num_encoder_layers=0).eval()
+    tr = CellMatesTransformer(D=512, K=int(512 / 16), num_encoder_layers=1).eval()
 
     b1 = collate_fn([repeated_cell_sample(n) for n in [2, 10]])
     b2 = collate_fn([repeated_cell_sample(n) for n in [2, 5]])
