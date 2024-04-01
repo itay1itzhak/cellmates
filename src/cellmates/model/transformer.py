@@ -299,7 +299,8 @@ class SpatialMultiHeadAttention(nn.Module):
         self.Wo = nn.Linear(D, D)
 
         # init scaler and move to device:
-        self.sqrt_K = torch.FloatTensor([sqrt(K)]).to(device)
+        self.sqrt_K = nn.Parameter(torch.tensor([sqrt(K)]))
+        self.sqrt_K.requires_grad = False
 
     def forward(
         self,
