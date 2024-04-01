@@ -35,6 +35,7 @@ def train_model(
     experiment_name: str = "cellmates",
     device: str | None = None,
     learning_rate: float = 1e-3,
+    num_workers: int = 1
 ):
     """Train a CellMatesTransformer model.
 
@@ -66,6 +67,8 @@ def train_model(
     Returns:
         _type_: _description_
     """
+    pl.seed_everything(seed=42)
+
     # load datasets if paths were provided
     if type(train_dataset) is str:
         train_dataset = CellMatesDataset.load(train_dataset)
@@ -74,10 +77,10 @@ def train_model(
 
     # init dataloaders:
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, collate_fn=collate_fn, shuffle=True
+        train_dataset, batch_size=batch_size, collate_fn=collate_fn, shuffle=True, num_workers=num_workers
     )
     valid_loader = DataLoader(
-        valid_dataset, batch_size=batch_size, collate_fn=collate_fn
+        valid_dataset, batch_size=batch_size, collate_fn=collate_fn, num_workers=num_workers
     )
 
     # Initialize the Model
@@ -119,14 +122,15 @@ def train_model(
         callbacks = None
 
     # Define PyTorch Lightning trainer
+    logger = None
     if use_wandb:
         # Create loggers (both Weights&Biases and local CSV file)
-        wandb_logger = WandbLogger(
+        logger = WandbLogger(
             name=f"cellmates_train-{experiment_name}", project="cellmates"
         )
 
         # log train loss
-        wandb_logger.log_hyperparams(
+        logger.log_hyperparams(
             {
                 "D": D,
                 "H": H,
@@ -145,20 +149,22 @@ def train_model(
                 "num_epochs": num_epochs,
             }
         )
-
-        trainer = pl.Trainer(
-            max_epochs=num_epochs,
-            logger=[wandb_logger],
-            callbacks=callbacks,
-        )
-    else:
-        trainer = pl.Trainer(
-            max_epochs=num_epochs,
-            callbacks=callbacks,
-        )
+    
+    trainer = pl.Trainer(
+        max_epochs=num_epochs,
+        logger=logger,
+        callbacks=callbacks,
+        # accelerator="cpu",
+        accelerator="gpu",
+        devices=1,
+    )
 
     # Train the model
-    trainer.fit(model, train_loader, valid_loader)
+    trainer.fit(
+        model=model, 
+        train_dataloaders=train_loader, 
+        val_dataloaders=valid_loader
+    ) # good valid_loader
 
     return model
 

@@ -25,7 +25,7 @@ class LightningCellMates(pl.LightningModule):
         padding_mask_BL = batch["padding_mask_BL"]
         target = batch["is_dividing_B"]
 
-        output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze()
+        output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze(-1)
         loss = self.loss_fn(output_B1, target)
 
         logs = {"train_loss": loss}
@@ -42,7 +42,7 @@ class LightningCellMates(pl.LightningModule):
         padding_mask_BL = batch["padding_mask_BL"]
         target = batch["is_dividing_B"]
 
-        output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze()
+        output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze(-1)
         val_loss = self.loss_fn(output_B1, target)
 
         self.log("val_loss", val_loss)

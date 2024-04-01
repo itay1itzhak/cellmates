@@ -35,10 +35,10 @@ def generate_dataset_for_cell_type() -> CellMatesDataset:
             cell_types=[1, second_cell_type],
             distances=torch.zeros((2, 2)),
             responder_cell_type=1,
-            is_dividing=(second_cell_type < 2),
+            is_dividing=(second_cell_type < 3),
         )
 
-    samples = [second_cell_type_sample(n) for n in range(5)]
+    samples = [second_cell_type_sample(n) for n in range(1,6)]
     return CellMatesDataset(samples)
 
 

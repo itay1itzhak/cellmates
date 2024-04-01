@@ -66,7 +66,7 @@ class CellMatesTransformer(nn.Module):
         dtype=None,
     ) -> None:
         """_summary_"""
-        torch.manual_seed(42)
+        # torch.manual_seed(42)
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
 
