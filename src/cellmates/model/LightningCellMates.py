@@ -66,7 +66,7 @@ class LightningCellMates(pl.LightningModule):
         fig = plot_calibration(
             predicted_probs=all_predicted_probs,
             true_labels=all_true_labels,
-            n_cells_per_bin=10,
+            n_cells_per_bin=2000,
         )
 
         image = wandb.Image(fig, caption="Calibration Plot")
