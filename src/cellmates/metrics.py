@@ -9,7 +9,7 @@ def plot_calibration(
     true_labels: np.ndarray,
     n_cells_per_bin: int = 1000,
     ax=None,
-    max_p=1.,
+    max_p=1.0,
     plot_min_max_lines: bool = False,
 ):
     n_bins = int(len(predicted_probs) / n_cells_per_bin)
@@ -40,6 +40,10 @@ def plot_calibration(
 
     ax.set_xlabel("predicted probability")
     ax.set_ylabel("true probability")
+
+    # add n_bins
+    for i in range(n_bins):
+        ax.axvline(i / n_bins, color="grey", linestyle="--", alpha=0.5)
 
     ax.set_xlim(-0.1, max_p)
     ax.set_ylim(-0.1, max_p)

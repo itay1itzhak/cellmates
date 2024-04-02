@@ -19,7 +19,6 @@ class LightningCellMates(pl.LightningModule):
         self.validation_preds = []
         self.validation_labels = []
 
-
     def forward(
         self, cell_types_BL: Tensor, distances_BLL: Tensor, padding_mask_BL: Tensor
     ):
@@ -60,13 +59,16 @@ class LightningCellMates(pl.LightningModule):
         return val_loss
 
     def on_validation_epoch_end(self):
-        all_predicted_probs = torch.stack(self.validation_preds).cpu().numpy().flatten()
-        all_true_labels = torch.stack(self.validation_labels).cpu().numpy().flatten()
+        all_predicted_probs = (
+            torch.concat(self.validation_preds).cpu().numpy().flatten()
+        )
+        all_true_labels = torch.concat(self.validation_labels).cpu().numpy().flatten()
 
         fig = plot_calibration(
             predicted_probs=all_predicted_probs,
             true_labels=all_true_labels,
-            n_cells_per_bin=2000,
+            # n_cells_per_bin=2000,
+            n_cells_per_bin=all_predicted_probs.shape[0] // 10,
         )
 
         image = wandb.Image(fig, caption="Calibration Plot")
@@ -74,7 +76,6 @@ class LightningCellMates(pl.LightningModule):
 
         self.validation_preds.clear()
         self.validation_labels.clear()
-
 
     def configure_optimizers(self):
         return Adam(self.model.parameters(), lr=self.learning_rate)

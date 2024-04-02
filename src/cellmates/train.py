@@ -36,7 +36,7 @@ def train_model(
     experiment_name: str = "cellmates",
     device: str | None = None,
     learning_rate: float = 1e-3,
-    num_workers: int = 1
+    num_workers: int = 4,
 ):
     """Train a CellMatesTransformer model.
 
@@ -78,7 +78,11 @@ def train_model(
 
     # init dataloaders:
     train_loader = DataLoader(
-        train_ds, batch_size=batch_size, collate_fn=collate_fn, shuffle=True, num_workers=num_workers
+        train_ds,
+        batch_size=batch_size,
+        collate_fn=collate_fn,
+        num_workers=num_workers,
+        shuffle=True,
     )
     valid_loader = DataLoader(
         val_ds, batch_size=batch_size, collate_fn=collate_fn, num_workers=num_workers
@@ -150,21 +154,21 @@ def train_model(
                 "num_epochs": n_epochs,
             }
         )
-    
+
     trainer = pl.Trainer(
         max_epochs=n_epochs,
         logger=logger,
         callbacks=callbacks,
-        accelerator=device,
-        devices=[2],
+        accumulate_grad_batches=1000 // batch_size,
+        log_every_n_steps=10,
+        # accelerator=device,
+        # devices=[0],
     )
 
     # Train the model
     trainer.fit(
-        model=model, 
-        train_dataloaders=train_loader, 
-        val_dataloaders=valid_loader
-    ) # good valid_loader
+        model=model, train_dataloaders=train_loader, val_dataloaders=valid_loader
+    )  # good valid_loader
 
     return model
 
