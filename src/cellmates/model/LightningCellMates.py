@@ -68,7 +68,8 @@ class LightningCellMates(pl.LightningModule):
         fig = plot_calibration(
             predicted_probs=all_predicted_probs,
             true_labels=all_true_labels,
-            n_cells_per_bin=1000,
+            # n_cells_per_bin=1000,
+            n_cells_per_bin=min(all_predicted_probs.shape[0] // 10, 1000),
         )
 
         image = wandb.Image(fig, caption="Calibration Plot")
@@ -77,7 +78,8 @@ class LightningCellMates(pl.LightningModule):
         high_res_fig = plot_calibration(
             predicted_probs=all_predicted_probs,
             true_labels=all_true_labels,
-            n_cells_per_bin=1000,
+            # n_cells_per_bin=1000,
+            n_cells_per_bin=min(all_predicted_probs.shape[0] // 10, 1000),
             max_p=0.2,
         )
 

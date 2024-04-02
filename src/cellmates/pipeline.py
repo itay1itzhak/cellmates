@@ -59,12 +59,9 @@ def main(
         batch_size=batch_size,
         **model_config,
         learning_rate=learning_rate,
-        device="cuda",
+        device="cuda" if torch.cuda.is_available() else "cpu",
         experiment_name=experiment_name,
     )
-
-    # save the trained model
-    torch.save(trained_model.state_dict(), f"{experiment_name}.pt")
 
 
 if __name__ == "__main__":
