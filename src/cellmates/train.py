@@ -160,7 +160,7 @@ def train_model(
         logger=logger,
         callbacks=callbacks,
         accumulate_grad_batches=1000 // batch_size,
-        log_every_n_steps=10,
+        log_every_n_steps=1,
         # accelerator=device,
         # devices=[0],
     )
@@ -168,7 +168,7 @@ def train_model(
     # Train the model
     trainer.fit(
         model=model, train_dataloaders=train_loader, val_dataloaders=valid_loader
-    )  # good valid_loader
+    )
 
     return model
 

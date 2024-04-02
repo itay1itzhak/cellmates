@@ -63,6 +63,9 @@ def main(
         experiment_name=experiment_name,
     )
 
+    # save the trained model
+    torch.save(trained_model.state_dict(), f"{experiment_name}.pt")
+
 
 if __name__ == "__main__":
     Fire(main)

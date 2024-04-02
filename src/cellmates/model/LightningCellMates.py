@@ -12,6 +12,7 @@ import wandb
 class LightningCellMates(pl.LightningModule):
     def __init__(self, model_config: dict, learning_rate: float):
         super().__init__()
+        self.save_hyperparameters()
         self.model = CellMatesTransformer(**model_config)
         self.loss_fn = BCEWithLogitsLoss()
         self.learning_rate = learning_rate
@@ -67,12 +68,21 @@ class LightningCellMates(pl.LightningModule):
         fig = plot_calibration(
             predicted_probs=all_predicted_probs,
             true_labels=all_true_labels,
-            # n_cells_per_bin=2000,
-            n_cells_per_bin=all_predicted_probs.shape[0] // 10,
+            n_cells_per_bin=1000,
         )
 
         image = wandb.Image(fig, caption="Calibration Plot")
         wandb.log({"calibration_plot": image})
+
+        high_res_fig = plot_calibration(
+            predicted_probs=all_predicted_probs,
+            true_labels=all_true_labels,
+            n_cells_per_bin=1000,
+            max_p=0.2,
+        )
+
+        high_res_image = wandb.Image(fig, caption="Calibration Plot")
+        wandb.log({"high_res_calibration_plot": high_res_image})
 
         self.validation_preds.clear()
         self.validation_labels.clear()
