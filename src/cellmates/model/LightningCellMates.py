@@ -83,7 +83,7 @@ class LightningCellMates(pl.LightningModule):
             max_p=0.2,
         )
 
-        high_res_image = wandb.Image(fig, caption="Calibration Plot")
+        high_res_image = wandb.Image(high_res_fig, caption="Calibration Plot")
         wandb.log({"high_res_calibration_plot": high_res_image})
 
         self.validation_preds.clear()
