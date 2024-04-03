@@ -118,7 +118,7 @@ def train_model(
         checkpoint_callback = ModelCheckpoint(
             monitor="val_loss",
             dirpath="checkpoints",
-            filename="cellmates-{experiment_name}" + "-{epoch:02d}-{val_loss:.2f}",
+            filename=f"cellmates-{experiment_name}" + "-{epoch:02d}-{val_loss:.2f}",
             save_top_k=3,
             mode="min",
         )
@@ -152,6 +152,7 @@ def train_model(
                 "bias": bias,
                 "batch_size": batch_size,
                 "num_epochs": n_epochs,
+                "learning_rate": learning_rate,
             }
         )
 
