@@ -80,7 +80,7 @@ class LightningCellMates(pl.LightningModule):
             true_labels=all_true_labels,
             # n_cells_per_bin=1000,
             n_cells_per_bin=min(all_predicted_probs.shape[0] // 10, 1000),
-            max_p=0.2,
+            max_p=0.1,
         )
 
         high_res_image = wandb.Image(high_res_fig, caption="Calibration Plot")
