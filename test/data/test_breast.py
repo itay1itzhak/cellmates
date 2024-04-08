@@ -9,9 +9,7 @@ from tdm.utils import microns
 from tdm.cell_types import FIBROBLAST, MACROPHAGE
 
 
-
-
-def test_one():
+def test_distances_reorder():
     st = StubTissue(
         cell_types=[FIBROBLAST],
         cell_type_xy_tuples=[
@@ -54,3 +52,28 @@ def test_one():
     )
 
     assert ds[2] == sample_2
+
+
+def test_cell_types_reorder():
+    st = StubTissue(
+        cell_types=[FIBROBLAST, MACROPHAGE],
+        cell_type_xy_tuples=[
+            (FIBROBLAST, microns(500), microns(500), 0), # located at 500,500, not dividing
+            (FIBROBLAST, microns(500), microns(500), 0),
+            (MACROPHAGE, microns(500), microns(550.1), 0),
+            (FIBROBLAST, microns(500), microns(600), 1)
+        ],
+        tissue_dimensions=(microns(1000), microns(1000))
+    )
+    ds = BreastCancerTissueDataset(
+        tissue=st, 
+        effective_distance=MAX_EFFECTIVE_DISTANCE, 
+        responder_cell_type=FIBROBLAST
+    )
+
+    f = CELL_TYPE_STR_TO_IDX[FIBROBLAST]
+    m = CELL_TYPE_STR_TO_IDX[MACROPHAGE]
+
+    assert torch.allclose(ds[0].cell_types, torch.tensor([f,f,m,f]))
+    assert torch.allclose(ds[1].cell_types, torch.tensor([f,f,m,f]))
+    assert torch.allclose(ds[2].cell_types, torch.tensor([f,f,f,m]))

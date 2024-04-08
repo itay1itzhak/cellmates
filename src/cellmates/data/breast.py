@@ -63,8 +63,10 @@ class BreastCancerTissueDataset(CellMatesDataset):
         # fetch cell types and swap the responder cell's location again:
         df = self.tissue.cell_df()
         cell_types = df.loc[nearby_cell_idxs, "integer_cell_type"].values
-        cell_types[[0, responder_cell_idx]] = cell_types[[responder_cell_idx, 0]]
-        responder_cell_type = cell_types[0]
+        responder_cell_type = cell_types[responder_cell_idx]
+        cell_types_without_responder = np.delete(cell_types, responder_cell_idx)
+        cell_types = np.insert(cell_types_without_responder, 0, responder_cell_type)
+        
 
         return Sample(
             cell_types=torch.tensor(cell_types, dtype=int),
