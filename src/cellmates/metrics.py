@@ -10,7 +10,7 @@ def plot_calibration(
     n_cells_per_bin: int = 1000,
     ax=None,
     max_p=1.0,
-    plot_min_max_lines: bool = False,
+    plot_min_max_lines: bool = True,
 ):
     n_bins = int(len(predicted_probs) / n_cells_per_bin)
     bin_true_p, bin_pred_p = calibration_curve(
@@ -24,8 +24,8 @@ def plot_calibration(
         fig, ax = plt.subplots(figsize=(10, 8))
 
     sns.lineplot(
-        x=np.linspace(-0.1, max_p, 10),
-        y=np.linspace(-0.1, max_p, 10),
+        x=np.linspace(-0.001, max_p, 10),
+        y=np.linspace(-0.001, max_p, 10),
         color="black",
         linestyle="--",
         ax=ax,
@@ -45,8 +45,8 @@ def plot_calibration(
     for i in range(n_bins):
         ax.axvline(i / n_bins, color="grey", linestyle="--", alpha=0.5)
 
-    ax.set_xlim(-0.1, max_p)
-    ax.set_ylim(-0.1, max_p)
+    ax.set_xlim(-0.001, max_p)
+    ax.set_ylim(-0.001, max_p)
     sns.despine(ax=ax)
 
     return fig

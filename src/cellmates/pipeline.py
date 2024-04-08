@@ -30,17 +30,18 @@ def main(
     """
     pl.seed_everything(42)
 
+    print('fetching datasets')
     ds = get_datasets(
         responder_cell_type=responder_cell_type,
         effective_distance=MAX_EFFECTIVE_DISTANCE,
         concatenated=True,
     )
+    print('done')
 
     # split the dataset into train, validation, and test sets
     n = len(ds)
     m = n // 10
     train_ds, val_ds, test_ds = random_split(ds, [7 * m, 2 * m, n - (9 * m)])
-    # train_ds, val_ds, test_ds = random_split(ds, [200, 20, n - 220])
 
     K = D // H
     model_config = {

@@ -73,7 +73,8 @@ class LightningCellMates(pl.LightningModule):
         )
 
         image = wandb.Image(fig, caption="Calibration Plot")
-        wandb.log({"calibration_plot": image})
+        # wandb.log({"calibration_plot": image})
+        self.logger.log_image("calibration plot", images=[image])
 
         high_res_fig = plot_calibration(
             predicted_probs=all_predicted_probs,
@@ -84,7 +85,8 @@ class LightningCellMates(pl.LightningModule):
         )
 
         high_res_image = wandb.Image(high_res_fig, caption="Calibration Plot")
-        wandb.log({"high_res_calibration_plot": high_res_image})
+        # wandb.log({"high_res_calibration_plot": high_res_image})
+        self.logger.log_image("high res calibration plot", images=[high_res_image])
 
         self.validation_preds.clear()
         self.validation_labels.clear()

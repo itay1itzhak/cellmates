@@ -47,15 +47,15 @@ class BreastCancerTissueDataset(CellMatesDataset):
             :, nearby_cell_idxs
         ]
 
-        # swap the row and column of the target cell to make it first:
+        # order of the responder cell among the cells in the neighborhood:
         responder_cell_idx = np.argwhere(nearby_cell_idxs == cell_idx).flatten()[0]
 
-        # swap rows:
+        # swap the row of the target cell to make it first:
         distances_to_nearby_cells[[0, responder_cell_idx]] = distances_to_nearby_cells[
             [responder_cell_idx, 0]
         ]
 
-        # swap columns:
+        # swap the column of the target cell to make it first:
         distances_to_nearby_cells[:, [0, responder_cell_idx]] = (
             distances_to_nearby_cells[:, [responder_cell_idx, 0]]
         )
@@ -72,7 +72,7 @@ class BreastCancerTissueDataset(CellMatesDataset):
             cell_types=torch.tensor(cell_types, dtype=int),
             distances=torch.tensor(distances_to_nearby_cells, dtype=int),
             responder_cell_type=responder_cell_type,
-            is_dividing=df.loc[responder_cell_idx, "division"],
+            is_dividing=df.loc[cell_idx, "division"],
         )
 
     def _distances(self) -> np.ndarray:

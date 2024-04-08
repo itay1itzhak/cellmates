@@ -161,6 +161,7 @@ def train_model(
         logger=logger,
         callbacks=callbacks,
         accumulate_grad_batches=1024 // batch_size,
+        # accumulate_grad_batches=2,
         log_every_n_steps=1,
         # accelerator=device,
         # devices=[0],
