@@ -8,19 +8,22 @@ from cellmates.utils import CELL_TYPE_STR_TO_IDX
 from cellmates.cache import persistent_cache
 
 from tdm.raw.raza_breast_mibi.utils import all_image_numbers
-from tdm.tissue import RazaBreast
+from tdm.tissue import Tissue, RazaBreast
 
+import torch
 from torch.utils.data import ConcatDataset, Dataset
 from cellmates.utils import MAX_EFFECTIVE_DISTANCE
+
+from copy import deepcopy
 
 
 class BreastCancerTissueDataset(CellMatesDataset):
     def __init__(
-        self, tissue_idx: int, effective_distance: int, responder_cell_type: str
+        self, tissue: int | Tissue, effective_distance: int, responder_cell_type: str
     ) -> None:
         self.responder_cell_type = responder_cell_type
         self.effective_distance = effective_distance
-        self.tissue = self._init_tissue(tissue_idx)
+        self.tissue = self._init_tissue(tissue)
         self.valid_cell_idxs = (
             self._valid_cell_idxs()
         )  # use only cells whose complete neighborhood is visible
@@ -64,8 +67,8 @@ class BreastCancerTissueDataset(CellMatesDataset):
         responder_cell_type = cell_types[0]
 
         return Sample(
-            cell_types=cell_types,
-            distances=distances_to_nearby_cells,
+            cell_types=torch.tensor(cell_types, dtype=int),
+            distances=torch.tensor(distances_to_nearby_cells, dtype=int),
             responder_cell_type=responder_cell_type,
             is_dividing=df.loc[responder_cell_idx, "division"],
         )
@@ -79,13 +82,22 @@ class BreastCancerTissueDataset(CellMatesDataset):
         xy_coords = self.tissue.cell_df()[["x", "y"]]
         return squareform(pdist(xy_coords)).astype(int)
 
-    def _init_tissue(self, tissue_idx: int) -> RazaBreast:
-        tissue = RazaBreast(tissue_idx)
+    def _init_tissue(self, tissue: int | Tissue) -> Tissue:
+        
+        if np.isscalar(tissue): # np.int64 doesn't pass isinstance(_,int)
+            tissue = RazaBreast(tissue)
+
+        tissue = deepcopy(tissue)
+
         df = tissue.cell_df()
 
         # we work with "integer microns", i.e 100 microns are just "100"
         df.loc[:, ["x", "y"]] = df.loc[:, ["x", "y"]] * 1e6
         df = df.astype({"x": int, "y": int}).reset_index(drop=True)
+
+        # convert original dimensions to int:
+        x_max, y_max = tissue._tissue_dimensions
+        tissue._tissue_dimensions = int(x_max * 1e6), int(y_max * 1e6)
 
         # map string cell types to integers:
         df = df.assign(integer_cell_type=df.cell_type.map(CELL_TYPE_STR_TO_IDX))
@@ -106,7 +118,7 @@ class BreastCancerTissueDataset(CellMatesDataset):
         is_correct_type = cell_df.cell_type == self.responder_cell_type
 
         x_min, y_min = 0, 0
-        x_max, y_max = cell_df.x.max(), cell_df.y.max()
+        x_max, y_max = self.tissue.tissue_dimensions()
 
         # compute x,y masks:
         xys = cell_df[["x", "y"]].to_numpy()
@@ -170,7 +182,7 @@ def get_datasets(
 def _get_datasets(responder_cell_type: str, effective_distance: int):
     return [
         BreastCancerTissueDataset(
-            tissue_idx=idx,
+            tissue=idx,
             effective_distance=effective_distance,
             responder_cell_type=responder_cell_type,
         )
@@ -180,7 +192,7 @@ def _get_datasets(responder_cell_type: str, effective_distance: int):
 def generate_one_tissue_dataset() -> CellMatesDataset:
 
     one_tissue_ds = BreastCancerTissueDataset(
-        tissue_idx=1, 
+        tissue=1, 
         effective_distance=MAX_EFFECTIVE_DISTANCE, 
         responder_cell_type='F'
     )

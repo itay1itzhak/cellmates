@@ -8,7 +8,7 @@ class Sample:
 
     def __init__(
         self,
-        cell_types: list[int],
+        cell_types: torch.Tensor,
         distances: torch.Tensor,
         responder_cell_type: int,
         is_dividing: bool,
@@ -35,3 +35,12 @@ class Sample:
         cell_types: {self.cell_types}
         distances: \n{self.distances}
         """
+    
+    def __eq__(self, other) -> bool:
+        return (
+            torch.allclose(self.cell_types,other.cell_types) and \
+            (self.is_dividing == other.is_dividing) and \
+            (self.responder_cell_type == other.responder_cell_type) and \
+            torch.allclose(self.distances, other.distances)
+        )
+        

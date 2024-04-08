@@ -160,7 +160,7 @@ def train_model(
         max_epochs=n_epochs,
         logger=logger,
         callbacks=callbacks,
-        accumulate_grad_batches=1000 // batch_size,
+        accumulate_grad_batches=1024 // batch_size,
         log_every_n_steps=1,
         # accelerator=device,
         # devices=[0],
