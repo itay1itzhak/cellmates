@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split, Subset
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 from cellmates.data.breast import generate_one_tissue_dataset
 from cellmates.train import train_model
@@ -45,20 +45,16 @@ def main(
         "num_encoder_layers": num_encoder_layers,
     }
 
-    print('fetching datasets')
+    print("fetching datasets")
 
     ds = get_datasets(
         responder_cell_type=responder_cell_type,
         effective_distance=MAX_EFFECTIVE_DISTANCE,
         concatenated=True,
     )
-    print('done')
+    print("done")
 
-    kfold = KFold(
-        n_splits=n_splits,
-        shuffle=True,
-        random_state=42
-    )
+    kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
 
     losses = []
 
@@ -66,7 +62,7 @@ def main(
 
         # split train_ids into train and validation:
         n = len(train_ids)
-        n_train = int(n * (7/9))
+        n_train = int(n * (7 / 9))
         n_val = n - n_train
         train_ids, val_ids = random_split(train_ids, [n_train, n_val])
 
@@ -90,9 +86,13 @@ def main(
 
         losses.append(test_loss)
 
-    print(f'{n_splits}-fold losses: {losses}')
-    np.savetxt(f"./kfold/{experiment_name}_{n_splits}-fold_losses.csv", np.array(losses), delimiter=",")
-        
+    print(f"{n_splits}-fold losses: {losses}")
+    np.savetxt(
+        f"./kfold/{experiment_name}_{n_splits}-fold_losses.csv",
+        np.array(losses),
+        delimiter=",",
+    )
+
 
 if __name__ == "__main__":
     Fire(main)

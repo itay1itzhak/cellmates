@@ -1,10 +1,10 @@
 import os
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 from torch.utils.data import DataLoader
 from fire import Fire
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger, CSVLogger
+from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import WandbLogger, CSVLogger
 
 from cellmates.data.sample import Sample
 from cellmates.data.dataset import CellMatesDataset, collate_fn
@@ -91,7 +91,10 @@ def train_model(
 
     if test_ds is not None:
         test_loader = DataLoader(
-            test_ds, batch_size=batch_size, collate_fn=collate_fn, num_workers=num_workers
+            test_ds,
+            batch_size=batch_size,
+            collate_fn=collate_fn,
+            num_workers=num_workers,
         )
 
     # Initialize the Model
@@ -173,13 +176,11 @@ def train_model(
     )
 
     # Train the model
-    trainer.fit(
-        model=model, train_dataloaders=train_loader, val_dataloaders=val_loader
-    )
+    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
     if test_ds is not None:
         # fetches best checkpoint and computes loss:
-        test_loss = trainer.test(dataloaders=test_loader)[0]['test_loss']
+        test_loss = trainer.test(dataloaders=test_loader)[0]["test_loss"]
         return model, test_loss
     else:
         return model

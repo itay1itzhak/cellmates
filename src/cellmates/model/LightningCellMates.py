@@ -1,4 +1,5 @@
-import pytorch_lightning as pl
+# import lightning.pytorch as pl
+import lightning.pytorch as pl
 from torch.optim import Adam
 from torch.nn import BCEWithLogitsLoss
 import torch
@@ -7,6 +8,7 @@ from torch.nn.functional import sigmoid
 from cellmates.model.transformer import CellMatesTransformer
 from cellmates.metrics import plot_calibration
 import wandb
+import matplotlib.pyplot as plt
 
 
 class LightningCellMates(pl.LightningModule):
@@ -58,7 +60,7 @@ class LightningCellMates(pl.LightningModule):
         self.validation_labels.append(target.detach())
 
         return val_loss
-    
+
     def test_step(self, batch, batch_nb):
         # fetch batch components:
         cell_types_BL = batch["cell_types_BL"]
@@ -104,6 +106,7 @@ class LightningCellMates(pl.LightningModule):
 
         self.validation_preds.clear()
         self.validation_labels.clear()
+        plt.close()
 
     def configure_optimizers(self):
         return Adam(self.model.parameters(), lr=self.learning_rate)
