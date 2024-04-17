@@ -52,12 +52,26 @@ class LightningCellMates(pl.LightningModule):
         output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze(-1)
         val_loss = self.loss_fn(output_B1, target)
 
-        self.log("val_loss", val_loss)
+        self.log("val_loss", val_loss, sync_dist=True)
 
         self.validation_preds.append(sigmoid(output_B1).detach())
         self.validation_labels.append(target.detach())
 
         return val_loss
+    
+    def test_step(self, batch, batch_nb):
+        # fetch batch components:
+        cell_types_BL = batch["cell_types_BL"]
+        distances_BLL = batch["distances_BLL"]
+        padding_mask_BL = batch["padding_mask_BL"]
+        target = batch["is_dividing_B"]
+
+        output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze(-1)
+        test_loss = self.loss_fn(output_B1, target)
+
+        self.log("test_loss", test_loss)
+
+        return test_loss
 
     def on_validation_epoch_end(self):
         all_predicted_probs = (

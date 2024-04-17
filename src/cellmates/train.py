@@ -15,6 +15,7 @@ from cellmates.utils import N_CELL_TYPES
 def train_model(
     train_ds: CellMatesDataset | str,
     val_ds: CellMatesDataset | str,
+    test_ds: CellMatesDataset | None = None,
     batch_size: int = 32,
     n_epochs: int = 100,
     D: int = 512,
@@ -84,9 +85,14 @@ def train_model(
         num_workers=num_workers,
         shuffle=True,
     )
-    valid_loader = DataLoader(
+    val_loader = DataLoader(
         val_ds, batch_size=batch_size, collate_fn=collate_fn, num_workers=num_workers
     )
+
+    if test_ds is not None:
+        test_loader = DataLoader(
+            test_ds, batch_size=batch_size, collate_fn=collate_fn, num_workers=num_workers
+        )
 
     # Initialize the Model
     model = LightningCellMates(
@@ -119,7 +125,7 @@ def train_model(
             monitor="val_loss",
             dirpath="checkpoints",
             filename=f"cellmates-{experiment_name}" + "-{epoch:02d}-{val_loss:.2f}",
-            save_top_k=3,
+            save_top_k=1,
             mode="min",
         )
         callbacks = [checkpoint_callback]
@@ -161,18 +167,22 @@ def train_model(
         logger=logger,
         callbacks=callbacks,
         accumulate_grad_batches=1024 // batch_size,
-        # accumulate_grad_batches=2,
         log_every_n_steps=1,
-        # accelerator=device,
-        # devices=[0],
+        # overfit_batches=3, # For debugging
+        # devices=[0]
     )
 
     # Train the model
     trainer.fit(
-        model=model, train_dataloaders=train_loader, val_dataloaders=valid_loader
+        model=model, train_dataloaders=train_loader, val_dataloaders=val_loader
     )
 
-    return model
+    if test_ds is not None:
+        # fetches best checkpoint and computes loss:
+        test_loss = trainer.test(dataloaders=test_loader)[0]['test_loss']
+        return model, test_loss
+    else:
+        return model
 
 
 if __name__ == "__main__":
