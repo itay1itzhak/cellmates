@@ -2,6 +2,7 @@
 import optuna
 from optuna.integration import PyTorchLightningPruningCallback
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.tuner import Tuner
 
 # import lightning.pytorch as L
 from lightning.pytorch.loggers import WandbLogger
@@ -21,10 +22,13 @@ from tdm.cell_types import FIBROBLAST
 from cellmates.pipeline import get_datasets_split
 
 
-BATCHSIZE = 32
-EPOCHS = 40
-DIR = os.getcwd()
+BATCHSIZE = 16
+EPOCHS = 30
 num_workers = 8
+TRAINER_PATIENCE = 3
+PRUNER_PATIENCE = 8
+
+DIR = os.getcwd()
 pl.seed_everything(42)
 RESPONDER_CELL_TYPE = None
 USE_TOY_SIZE = None
@@ -32,14 +36,14 @@ USE_TOY_SIZE = None
 
 def objective(trial: optuna.trial.Trial) -> float:
     # We optimize for every parameter in the model
-    num_encoder_layers = trial.suggest_categorical("num_encoder_layers", [1, 2, 4])
-    D = trial.suggest_categorical("D", [128, 256, 512])
-    H = trial.suggest_categorical("H", [8, 16, 32])
+    num_encoder_layers = trial.suggest_categorical("num_encoder_layers", [5, 8])
+    D = trial.suggest_categorical("D", [512, 1024])
+    H = trial.suggest_categorical("H", [16, 32])
     K = D // H
     F = trial.suggest_categorical("F", [512, 1024])
     M = trial.suggest_categorical("M", [512, 1024, 2048])
     n_cell_types = N_CELL_TYPES
-    dropout_p = trial.suggest_float("dropout_p", 0.1, 0.3)
+    dropout_p = trial.suggest_float("dropout_p", 0.1, 0.4)
     # activation = trial.suggest_categorical("activation", ["relu", "gelu"])
     layer_norm_eps = trial.suggest_float("layer_norm_eps", 1e-5, 1e-3)
     batch_first = True
@@ -81,11 +85,17 @@ def objective(trial: optuna.trial.Trial) -> float:
         val_ds, batch_size=BATCHSIZE, collate_fn=collate_fn, num_workers=num_workers
     )
 
-    logger = WandbLogger(name=f"cellmates_sweep-", project="cellmates")
+    logger = WandbLogger(
+        name=f"cellmates_sweep-trail_{trial.number}", project="cellmates"
+    )
 
     # stop training if val_loss does not improve for 3 epochs
     early_stop_callback = EarlyStopping(
-        monitor="val_loss", min_delta=0.0005, patience=3, verbose=False, mode="min"
+        monitor="val_loss",
+        min_delta=0.0002,
+        patience=TRAINER_PATIENCE,
+        verbose=False,
+        mode="min",
     )
 
     trainer = pl.Trainer(
@@ -98,6 +108,7 @@ def objective(trial: optuna.trial.Trial) -> float:
             early_stop_callback,
         ],
         accumulate_grad_batches=1024 // BATCHSIZE,
+        enable_progress_bar=False,
     )
     hyperparameters = dict(
         num_encoder_layers=num_encoder_layers,
@@ -116,30 +127,69 @@ def objective(trial: optuna.trial.Trial) -> float:
         learning_rate=learning_rate,
     )
     trainer.logger.log_hyperparams(hyperparameters)
+    print(hyperparameters)
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=valid_loader)
 
+    if trial.should_prune():
+        # report epoch number
+        trial.report(trainer.callback_metrics["val_loss"].item(), trainer.current_epoch)
+        raise optuna.TrialPruned()
+
+    print("Current after fit val_loss: ", trainer.callback_metrics["val_loss"].item())
     return trainer.callback_metrics["val_loss"].item()
 
 
-def main(
-    responder_cell_type: str = FIBROBLAST, n_trials=35, pruning=True, use_toy_size=False
-):
+def visualize_study(study, study_name):
+    # Visualize the optimization history of the study, which is useful to find out how the hyperparameters have been optimized.
+    # The axis of the graph are the trial numbers and the objective values, respectively.
+    # The red and blue points indicate pruned and finished trials, respectively.
+    # The green line shows the best objective values of the finished trials
+    # at each step.
+    # save to file the plots
+    optuna.visualization.plot_optimization_history(study).write_image(
+        f"{study_name}_optimization_history.png"
+    )
+    # plot_intermediate_values
+    optuna.visualization.plot_intermediate_values(study).write_image(
+        f"{study_name}_intermediate_values.png"
+    )
+    # plot_param_importances
+    optuna.visualization.plot_param_importances(study).write_image(
+        f"{study_name}_param_importances.png"
+    )
+
+
+def main(responder_cell_type=FIBROBLAST, n_trials=20, pruning=True, use_toy_size=False):
     # change global var
     global USE_TOY_SIZE
     USE_TOY_SIZE = use_toy_size
     global RESPONDER_CELL_TYPE
     RESPONDER_CELL_TYPE = responder_cell_type
     print(f"Optimizing hyperparameters for {responder_cell_type}")
+    # print number of trails
+    print(f"Number of trials: {n_trials}")
 
-    pruner = optuna.pruners.MedianPruner() if pruning else optuna.pruners.NopPruner()
+    pruner = (
+        optuna.pruners.PatientPruner(
+            optuna.pruners.MedianPruner(), patience=PRUNER_PATIENCE
+        )
+        if pruning
+        else optuna.pruners.NopPruner()
+    )
+    study_name = f"cellmates_n_trail_{n_trials}_responder_{responder_cell_type}_use_toy_size_{use_toy_size}"
+    storage_name = f"sqlite:///{study_name}.db"
     study = optuna.create_study(
-        direction="minimize", pruner=pruner, study_name="cellmates", load_if_exists=True
+        direction="minimize",
+        pruner=pruner,
+        study_name=study_name,
+        load_if_exists=True,
+        storage=storage_name,
     )
     study.optimize(
         objective,
         n_trials=n_trials,
-        timeout=600,
         gc_after_trial=True,
+        show_progress_bar=True,
     )
 
     print("Number of finished trials: {}".format(len(study.trials)))
@@ -153,17 +203,24 @@ def main(
     print(tabulate(df, headers="keys", tablefmt="pretty", floatfmt=".5f"))
 
     # output to csv
-    df.to_csv("cellmates_hyperparameters.csv")
+    df.to_csv(
+        f"cellmates_hyperparameters_n_trail_{n_trials}_responder_{responder_cell_type}_use_toy_size_{use_toy_size}.csv"
+    )
 
     print("Best trial:")
     trial = study.best_trial
 
     # print value with the best trial
     print("  Value: ", trial.value)
+    # print trail number
+    print("  Number: ", trial.number)
 
     print("  Params: ")
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
+
+    # visualize optimization history
+    visualize_study(study, study_name)
 
 
 if __name__ == "__main__":

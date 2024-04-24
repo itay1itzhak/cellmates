@@ -1,7 +1,6 @@
 import pytest
 import torch
 from torch.utils.data import DataLoader
-import pytorch_lightning as pl
 from cellmates.data.stubs import (
     generate_dataset_for_distances,
     generate_dataset_for_cell_type,
@@ -33,7 +32,7 @@ def test_toy_dataset(
     test_dataset = load_dataset_func()
 
     model_config["num_encoder_layers"] = num_encoder_layers
-    model_config['device'] = 'cuda'
+    model_config["device"] = "cuda"
 
     trained_model = train_model(
         train_ds=test_dataset,
