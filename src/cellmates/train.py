@@ -162,14 +162,17 @@ def train_model(
             }
         )
 
+    # https://github.com/Lightning-AI/pytorch-lightning/discussions/5796
+    accumulate_grad_batches = 1024 // (batch_size*torch.cuda.device_count())
+
     trainer = pl.Trainer(
         max_epochs=n_epochs,
         logger=logger,
         callbacks=callbacks,
-        accumulate_grad_batches=1024 // batch_size,
+        accumulate_grad_batches=accumulate_grad_batches,
         log_every_n_steps=1,
         # overfit_batches=3, # For debugging
-        # devices=[0]
+        # devices=1
     )
 
     # Train the model

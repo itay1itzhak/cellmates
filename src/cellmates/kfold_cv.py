@@ -8,7 +8,7 @@ from cellmates.train import train_model
 from cellmates.data.dataset import collate_fn
 
 from cellmates.data.breast import get_datasets
-from cellmates.utils import MAX_EFFECTIVE_DISTANCE
+from cellmates.utils import MAX_EFFECTIVE_DISTANCE, PROJECT_ROOT_PATH
 from tdm.cell_types import FIBROBLAST
 
 from sklearn.model_selection import KFold
@@ -28,6 +28,8 @@ def main(
     M: int = 1024,
     num_encoder_layers: int = 2,
     experiment_name: str = "",
+    dropout_p: float = 0.1,
+    layer_norm_eps: float = 1e-3,
 ):
     """
     Tests that the model correctly learns the relationship between cell distances and division.
@@ -43,6 +45,8 @@ def main(
         "F": F,
         "M": M,
         "num_encoder_layers": num_encoder_layers,
+        "dropout_p": dropout_p,
+        "layer_norm_eps": layer_norm_eps,
     }
 
     print('fetching datasets')
@@ -75,6 +79,8 @@ def main(
         val_ds = Subset(ds, val_ids)
         test_ds = Subset(ds, test_ids)
 
+        print(f'n train, val, test samples = {len(train_ds), len(val_ds), len(test_ids)}')
+
         # fit - saves top checkpoint for every fold:
         trained_model, test_loss = train_model(
             train_ds=train_ds,
@@ -86,17 +92,47 @@ def main(
             learning_rate=learning_rate,
             device="cuda" if torch.cuda.is_available() else "cpu",
             experiment_name=experiment_name + f"_fold_{fold}",
+            save_checkpoint=True,
         )
 
         losses.append(test_loss)
 
+    # TODO - error due to DDP, each process computes loss using a subset of the data
     print(f'{n_splits}-fold losses: {losses}')
-    np.savetxt(f"./kfold/{experiment_name}_{n_splits}-fold_losses.csv", np.array(losses), delimiter=",")
+    np.savetxt(str(PROJECT_ROOT_PATH) + f"/kfold_cv/{experiment_name}_{n_splits}-fold_losses.csv", np.array(losses), delimiter=",")
         
 
 if __name__ == "__main__":
     Fire(main)
 
 """
-python src/cellmates/kfold_cv.py --batch_size 16 --n_epochs 1 --D 128 --H 8 --F 128 --M 128 --num_encoder_layers 1 --learning_rate 1e-3 --experiment_name 1_layers_lr_1e-3_epoch_1_kfolds_10 --n_splits 3
+python src/cellmates/kfold_cv.py --batch_size 2 --n_epochs 40 --num_encoder_layers 4 --D 512 --H 32 --F 1024 --M 512 --dropout_p 0.28330882325349427 --layer_norm_eps 0.0002947682439783808 --learning_rate 0.000525684163595057 --experiment_name best_params_10fold_cv --n_splits 10 
+
+
+params:
+    num_encoder_layers: 4
+    D: 512
+    H: 32
+    F: 1024
+    M: 512
+    dropout_p: 0.28330882325349427
+    layer_norm_eps: 0.0002947682439783808
+    learning_rate: 0.000525684163595057
+
+results:
+[
+    0.04596949741244316, 
+    0.051153168082237244, 
+    0.06382358819246292, 
+    0.05529382452368736, 
+    0.06056812405586243,
+    0.05057327821850777, 
+    0.10690890997648239,
+    0.07534198462963104,
+    0.09805398434400558,
+    0.06615480035543442
+]
+
+
+python src/cellmates/kfold_cv.py --batch_size 2 --n_epochs 40 --num_encoder_layers 4 --D 512 --H 32 --F 1024 --M 512 --dropout_p 0.28330882325349427 --layer_norm_eps 0.0002947682439783808 --learning_rate 0.000525684163595057 --experiment_name TUMOR_CELLS_10fold_cv --n_splits 10 responder_cell_type=Tu
 """

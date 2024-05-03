@@ -1,5 +1,7 @@
 from tdm.cell_types import CELL_TYPES_ARRAY
+import pathlib as path
 
+PROJECT_ROOT_PATH = path.Path().resolve().parent
 
 def microns(x: int) -> float:
     """Converts the number of microns x, into a float representing the number of meters.

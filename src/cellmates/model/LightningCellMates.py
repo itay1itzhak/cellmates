@@ -69,9 +69,20 @@ class LightningCellMates(pl.LightningModule):
         output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze(-1)
         test_loss = self.loss_fn(output_B1, target)
 
-        self.log("test_loss", test_loss)
+        self.log("test_loss", test_loss, sync_dist=True)
 
         return test_loss
+
+    def predict_step(self, batch, batch_nb):
+        # fetch batch components:
+        cell_types_BL = batch["cell_types_BL"]
+        distances_BLL = batch["distances_BLL"]
+        padding_mask_BL = batch["padding_mask_BL"]
+        target = batch["is_dividing_B"]
+
+        output_B1 = self(cell_types_BL, distances_BLL, padding_mask_BL).squeeze()
+
+        return sigmoid(output_B1)
 
     def on_validation_epoch_end(self):
         all_predicted_probs = (
@@ -79,28 +90,31 @@ class LightningCellMates(pl.LightningModule):
         )
         all_true_labels = torch.concat(self.validation_labels).cpu().numpy().flatten()
 
-        fig = plot_calibration(
-            predicted_probs=all_predicted_probs,
-            true_labels=all_true_labels,
-            # n_cells_per_bin=1000,
-            n_cells_per_bin=min(all_predicted_probs.shape[0] // 10, 1000),
-        )
+        # prevent error on sanity check dataloader:
+        if len(all_predicted_probs) > 1000 and False:
 
-        image = wandb.Image(fig, caption="Calibration Plot")
-        # wandb.log({"calibration_plot": image})
-        self.logger.log_image("calibration plot", images=[image])
+            fig = plot_calibration(
+                predicted_probs=all_predicted_probs,
+                true_labels=all_true_labels,
+                n_cells_per_bin=1000,
+                # n_cells_per_bin=min(all_predicted_probs.shape[0] // 10, 1000),
+            )
 
-        high_res_fig = plot_calibration(
-            predicted_probs=all_predicted_probs,
-            true_labels=all_true_labels,
-            # n_cells_per_bin=1000,
-            n_cells_per_bin=min(all_predicted_probs.shape[0] // 10, 1000),
-            max_p=0.1,
-        )
+            image = wandb.Image(fig, caption="Calibration Plot")
+            # wandb.log({"calibration_plot": image})
+            self.logger.log_image("calibration plot", images=[image])
 
-        high_res_image = wandb.Image(high_res_fig, caption="Calibration Plot")
-        # wandb.log({"high_res_calibration_plot": high_res_image})
-        self.logger.log_image("high res calibration plot", images=[high_res_image])
+            high_res_fig = plot_calibration(
+                predicted_probs=all_predicted_probs,
+                true_labels=all_true_labels,
+                n_cells_per_bin=1000,
+                # n_cells_per_bin=min(all_predicted_probs.shape[0] // 10, 1000),
+                max_p=0.1,
+            )
+
+            high_res_image = wandb.Image(high_res_fig, caption="Calibration Plot")
+            # wandb.log({"high_res_calibration_plot": high_res_image})
+            self.logger.log_image("high res calibration plot", images=[high_res_image])
 
         self.validation_preds.clear()
         self.validation_labels.clear()
