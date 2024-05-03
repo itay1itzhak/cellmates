@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, random_split
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 from cellmates.data.breast import generate_one_tissue_dataset
 from cellmates.train import train_model
@@ -11,6 +11,28 @@ from cellmates.utils import MAX_EFFECTIVE_DISTANCE
 from tdm.cell_types import FIBROBLAST
 
 from fire import Fire
+
+
+def get_datasets_split(responder_cell_type, use_toy_size=False):
+    print("fetching datasets")
+    ds = get_datasets(
+        responder_cell_type=responder_cell_type,
+        effective_distance=MAX_EFFECTIVE_DISTANCE,
+        concatenated=True,
+    )
+    print("done")
+
+    # split the dataset into train, validation, and test sets
+    n = len(ds)
+    m = n // 10
+    train_ds, val_ds, test_ds = random_split(ds, [7 * m, 2 * m, n - (9 * m)])
+
+    if (
+        use_toy_size
+    ):  # use only 20 train smaples for testing using random_split set all to tests
+        train_ds, val_ds, test_ds = random_split(ds, [10, 20, n - 30])
+
+    return train_ds, val_ds, test_ds
 
 
 def main(
@@ -30,18 +52,7 @@ def main(
     """
     pl.seed_everything(42)
 
-    print('fetching datasets')
-    ds = get_datasets(
-        responder_cell_type=responder_cell_type,
-        effective_distance=MAX_EFFECTIVE_DISTANCE,
-        concatenated=True,
-    )
-    print('done')
-
-    # split the dataset into train, validation, and test sets
-    n = len(ds)
-    m = n // 10
-    train_ds, val_ds, test_ds = random_split(ds, [7 * m, 2 * m, n - (9 * m)])
+    train_ds, val_ds, test_ds = get_datasets_split(responder_cell_type)
 
     K = D // H
     model_config = {
