@@ -19,7 +19,11 @@ from copy import deepcopy
 
 class BreastCancerTissueDataset(CellMatesDataset):
     def __init__(
-        self, tissue: int | Tissue, effective_distance: int, responder_cell_type: str
+        self,
+        tissue: int | Tissue,
+        effective_distance: int,
+        responder_cell_type: str,
+        mask_third_party_cells_distances: bool = False,
     ) -> None:
         self.responder_cell_type = responder_cell_type
         self.effective_distance = effective_distance
@@ -28,6 +32,7 @@ class BreastCancerTissueDataset(CellMatesDataset):
             self._valid_cell_idxs()
         )  # use only cells whose complete neighborhood is visible
         self.distances = self._distances()
+        self.mask_third_party_cells_distances = mask_third_party_cells_distances
 
     def __len__(self) -> int:
         return len(self.valid_cell_idxs)
@@ -66,7 +71,12 @@ class BreastCancerTissueDataset(CellMatesDataset):
         responder_cell_type = cell_types[responder_cell_idx]
         cell_types_without_responder = np.delete(cell_types, responder_cell_idx)
         cell_types = np.insert(cell_types_without_responder, 0, responder_cell_type)
-        
+
+        # mask third party cells distances for distance ablation study:
+        if self.mask_third_party_cells_distances:
+            distances_to_nearby_cells[1:, 1:] = (
+                self.effective_distance
+            )  # mask all distances except the responder cell
 
         return Sample(
             cell_types=torch.tensor(cell_types, dtype=int),
@@ -85,8 +95,8 @@ class BreastCancerTissueDataset(CellMatesDataset):
         return squareform(pdist(xy_coords)).astype(int)
 
     def _init_tissue(self, tissue: int | Tissue) -> Tissue:
-        
-        if np.isscalar(tissue): # np.int64 doesn't pass isinstance(_,int)
+
+        if np.isscalar(tissue):  # np.int64 doesn't pass isinstance(_,int)
             tissue = RazaBreast(tissue)
 
         tissue = deepcopy(tissue)
@@ -159,6 +169,7 @@ def get_datasets(
     responder_cell_type: str,
     effective_distance: int,
     concatenated: Literal[True, False] = False,
+    mask_third_party_cells_distances: bool = False,
 ) -> Dataset | list[Dataset]:
     """Wrapper for the cached function `_get_datasets`.
 
@@ -166,12 +177,15 @@ def get_datasets(
         responder_cell_type (str): identifier of the type (see `CELL_TYPES_ARRAY` in `cellmates.utils`)
         effective_distance (int): number of microns we consider around the reponder cell.
         concatenated (Literal[True, False], optional): Defaults to False.
+        mask_third_party_cells_distances (bool, optional): Defaults to False.
 
     Returns:
         Dataset | list[Dataset]: _description_
     """
     dss = _get_datasets(
-        responder_cell_type=responder_cell_type, effective_distance=effective_distance
+        responder_cell_type=responder_cell_type,
+        effective_distance=effective_distance,
+        mask_third_party_cells_distances=mask_third_party_cells_distances,
     )
 
     if concatenated:
@@ -181,25 +195,28 @@ def get_datasets(
 
 
 @persistent_cache
-def _get_datasets(responder_cell_type: str, effective_distance: int):
+def _get_datasets(
+    responder_cell_type: str,
+    effective_distance: int,
+    mask_third_party_cells_distances: bool,
+):
     return [
         BreastCancerTissueDataset(
             tissue=idx,
             effective_distance=effective_distance,
             responder_cell_type=responder_cell_type,
+            mask_third_party_cells_distances=mask_third_party_cells_distances,
         )
         for idx in all_image_numbers()
     ]
 
+
 def generate_one_tissue_dataset() -> CellMatesDataset:
 
     one_tissue_ds = BreastCancerTissueDataset(
-        tissue=1, 
-        effective_distance=MAX_EFFECTIVE_DISTANCE, 
-        responder_cell_type='F'
+        tissue=1, effective_distance=MAX_EFFECTIVE_DISTANCE, responder_cell_type="F"
     )
 
     samples = [s for s in one_tissue_ds]
 
     return CellMatesDataset(samples)
-

@@ -8,17 +8,20 @@ from cellmates.data.dataset import collate_fn
 
 from cellmates.data.breast import get_datasets
 from cellmates.utils import MAX_EFFECTIVE_DISTANCE
-from tdm.cell_types import FIBROBLAST
+from tdm.cell_types import FIBROBLAST, TUMOR
 
 from fire import Fire
 
 
-def get_datasets_split(responder_cell_type, use_toy_size=False):
+def get_datasets_split(
+    responder_cell_type, mask_third_party_cells_distances=False, use_toy_size=False
+):
     print("fetching datasets")
     ds = get_datasets(
         responder_cell_type=responder_cell_type,
         effective_distance=MAX_EFFECTIVE_DISTANCE,
         concatenated=True,
+        mask_third_party_cells_distances=mask_third_party_cells_distances,
     )
     print("done")
 
@@ -31,6 +34,9 @@ def get_datasets_split(responder_cell_type, use_toy_size=False):
         use_toy_size
     ):  # use only 20 train smaples for testing using random_split set all to tests
         train_ds, val_ds, test_ds = random_split(ds, [10, 20, n - 30])
+        print("=" * 30)
+        print("Using toy dataset")
+        print("=" * 30)
 
     return train_ds, val_ds, test_ds
 
@@ -46,13 +52,21 @@ def main(
     M: int = 1024,
     num_encoder_layers: int = 2,
     experiment_name: str = "",
+    use_wandb: bool = True,
+    save_checkpoint: bool = True,
+    use_toy_size: bool = False,
+    mask_third_party_cells_distances: bool = False,
 ):
     """
     Tests that the model correctly learns the relationship between cell distances and division.
     """
     pl.seed_everything(42)
 
-    train_ds, val_ds, test_ds = get_datasets_split(responder_cell_type)
+    train_ds, val_ds, test_ds = get_datasets_split(
+        responder_cell_type,
+        mask_third_party_cells_distances=mask_third_party_cells_distances,
+        use_toy_size=use_toy_size,
+    )
 
     K = D // H
     model_config = {
@@ -73,6 +87,8 @@ def main(
         learning_rate=learning_rate,
         device="cuda" if torch.cuda.is_available() else "cpu",
         experiment_name=experiment_name,
+        save_checkpoint=save_checkpoint,
+        use_wandb=use_wandb,
     )
 
 

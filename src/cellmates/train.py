@@ -25,9 +25,9 @@ def train_model(
     M: int = 512,
     n_cell_types: int = N_CELL_TYPES,
     num_encoder_layers: int = 8,
-    dropout_p: float = 0.1,
+    dropout_p: float = 0.28,  # 0.1,
     activation: str = "relu",
-    layer_norm_eps: float = 1e-5,
+    layer_norm_eps: float = 0.000294,  # 1e-5,
     batch_first: bool = True,
     norm_first: bool = True,
     bias: bool = True,
@@ -126,14 +126,24 @@ def train_model(
     if save_checkpoint:
         checkpoint_callback = ModelCheckpoint(
             monitor="val_loss",
-            dirpath="checkpoints",
-            filename=f"cellmates-{experiment_name}" + "-{epoch:02d}-{val_loss:.2f}",
+            # dirpath="checkpoints",
+            # filename=f"cellmates-{experiment_name}" + "-{epoch:02d}-{val_loss:.2f}",
+            dirpath=f"checkpoints/{experiment_name}",
+            filename="-{epoch:02d}-{val_loss:.2f}",
             save_top_k=1,
             mode="min",
+            save_last=True,  # checkpoint the last epoch to be able to resume training named as "last.ckpt"
+            enable_version_counter=False,  # do not append version number to checkpoint filename to enable resuming training
         )
         callbacks = [checkpoint_callback]
+        # if last checkpoint exists, load it
+        ckpt_path = os.path.join(f"checkpoints/{experiment_name}", "last.ckpt")
+        # check if exists
+        if not os.path.exists(ckpt_path):
+            ckpt_path = None
     else:
         callbacks = None
+        ckpt_path = None
 
     # Define PyTorch Lightning trainer
     logger = None
@@ -166,7 +176,9 @@ def train_model(
         )
 
     # https://github.com/Lightning-AI/pytorch-lightning/discussions/5796
-    accumulate_grad_batches = 1024 // (batch_size*torch.cuda.device_count())
+    accumulate_grad_batches = 1024 // (
+        batch_size * max(1, torch.cuda.device_count())
+    )  # support cpu and gpu training
 
     trainer = pl.Trainer(
         max_epochs=n_epochs,
@@ -176,10 +188,21 @@ def train_model(
         log_every_n_steps=1,
         # overfit_batches=3, # For debugging
         # devices=1
+        # load from last.ckpt if it exists
+        # os.path.join(
+        #     f"checkpoints/{experiment_name}", "last.ckpt"
+        # ),
+        default_root_dir=os.path.join("checkpoints", experiment_name),
     )
 
     # Train the model
-    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    trainer.fit(
+        model=model,
+        train_dataloaders=train_loader,
+        val_dataloaders=val_loader,
+        # add checkpoint if exists, else start from scratch
+        ckpt_path=ckpt_path,
+    )
 
     if test_ds is not None:
         # fetches best checkpoint and computes loss:

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split, Subset
@@ -9,7 +10,7 @@ from cellmates.data.dataset import collate_fn
 
 from cellmates.data.breast import get_datasets
 from cellmates.utils import MAX_EFFECTIVE_DISTANCE, PROJECT_ROOT_PATH
-from tdm.cell_types import FIBROBLAST
+from tdm.cell_types import FIBROBLAST, TUMOR, B_CELL
 
 from sklearn.model_selection import KFold
 
@@ -30,6 +31,7 @@ def main(
     experiment_name: str = "",
     dropout_p: float = 0.1,
     layer_norm_eps: float = 1e-3,
+    use_toy_size: bool = False,
 ):
     """
     Tests that the model correctly learns the relationship between cell distances and division.
@@ -58,6 +60,13 @@ def main(
     )
     print("done")
 
+    if use_toy_size:
+        print("=" * 30)
+        print("Using toy dataset")
+        print("=" * 30)
+        # use only first 50 examples from ds
+        ds = Subset(ds, range(50))
+
     kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
 
     losses = []
@@ -75,7 +84,9 @@ def main(
         val_ds = Subset(ds, val_ids)
         test_ds = Subset(ds, test_ids)
 
-        print(f'n train, val, test samples = {len(train_ds), len(val_ds), len(test_ids)}')
+        print(
+            f"n train, val, test samples = {len(train_ds), len(val_ds), len(test_ids)}"
+        )
 
         # fit - saves top checkpoint for every fold:
         trained_model, test_loss = train_model(
@@ -94,9 +105,21 @@ def main(
         losses.append(test_loss)
 
     # TODO - error due to DDP, each process computes loss using a subset of the data
-    print(f'{n_splits}-fold losses: {losses}')
-    np.savetxt(str(PROJECT_ROOT_PATH) + f"/kfold_cv/{experiment_name}_{n_splits}-fold_losses.csv", np.array(losses), delimiter=",")
-        
+    print(f"{n_splits}-fold losses: {losses}")
+
+    save_path = (
+        str(PROJECT_ROOT_PATH)
+        + f"/kfold_cv/{experiment_name}_{n_splits}-fold_losses.csv"
+    )
+    # create a directory if it does not exist
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    print(f"saving losses to {save_path}")
+    np.savetxt(
+        save_path,
+        np.array(losses),
+        delimiter=",",
+    )
+
 
 if __name__ == "__main__":
     Fire(main)
