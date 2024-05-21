@@ -88,6 +88,9 @@ def main(
             f"n train, val, test samples = {len(train_ds), len(val_ds), len(test_ids)}"
         )
 
+        # print fold number out of
+        print(f"fold {fold + 1}/{n_splits}")
+
         # fit - saves top checkpoint for every fold:
         trained_model, test_loss = train_model(
             train_ds=train_ds,
@@ -100,6 +103,8 @@ def main(
             device="cuda" if torch.cuda.is_available() else "cpu",
             experiment_name=experiment_name + f"_fold_{fold}",
             save_checkpoint=True,
+            log_every_n_steps=100,
+            num_sanity_val_steps=0,
         )
 
         losses.append(test_loss)

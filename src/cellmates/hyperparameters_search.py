@@ -108,7 +108,7 @@ def objective(trial: optuna.trial.Trial) -> float:
             early_stop_callback,
         ],
         accumulate_grad_batches=1024 // BATCHSIZE,
-        enable_progress_bar=False,
+        log_every_n_steps=100,
     )
     hyperparameters = dict(
         num_encoder_layers=num_encoder_layers,

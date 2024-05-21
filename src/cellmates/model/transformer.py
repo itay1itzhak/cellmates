@@ -131,18 +131,24 @@ class CellMatesTransformer(nn.Module):
         Testing various pooling strategies:
         """
 
+        # Chosen pooling - special cell + mean of cells:
+        Ls = (
+            padding_mask_BL[:, 1:].sum(axis=-1).unsqueeze(-1)
+        )  # number of (non-padding) cells in each sample
+        mean_of_cells = (
+            torch.einsum("BLD,BL->BD", hidden_BLD[:, 1:, :], padding_mask_BL[:, 1:])
+            / Ls
+        )
+        output_BD = (hidden_BLD[:, 0, :] + mean_of_cells) / 2
+
+        # just the mean of cells (ablation, delete this for normal run):
+        # output_BD = mean_of_cells
+
         # pooling - sum without padding vectors
         # output_BD = torch.einsum("BLD,BL->BD", hidden_BLD, padding_mask_BL)
 
         # mean of special vector and target cell:
         # output_BD = torch.mean(hidden_BLD[:, :2, :], dim=1)  # special cell type + first cell
-
-        # special cell + mean of cells:
-        Ls = padding_mask_BL[:, 1:].sum(axis=-1).unsqueeze(-1) # number of (non-padding) cells in each sample
-        mean_of_cells = (
-            torch.einsum("BLD,BL->BD", hidden_BLD[:, 1:, :], padding_mask_BL[:, 1:]) / Ls
-        )
-        output_BD = (hidden_BLD[:, 0, :] + mean_of_cells) / 2
 
         # test:
         # output_BD = hidden_BLD[:, 0, :] + torch.mean(

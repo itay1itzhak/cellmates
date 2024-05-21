@@ -54,6 +54,7 @@ def main(
     experiment_name: str = "",
     use_wandb: bool = True,
     save_checkpoint: bool = True,
+    log_every_n_steps : int = 1,
     use_toy_size: bool = False,
     mask_third_party_cells_distances: bool = False,
 ):
@@ -89,6 +90,7 @@ def main(
         experiment_name=experiment_name,
         save_checkpoint=save_checkpoint,
         use_wandb=use_wandb,
+        log_every_n_steps=log_every_n_steps,
     )
 
 

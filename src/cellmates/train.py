@@ -38,6 +38,8 @@ def train_model(
     device: str | None = None,
     learning_rate: float = 1e-3,
     num_workers: int = 4,
+    log_every_n_steps: int = 1,
+    num_sanity_val_steps: int = 2,
 ):
     """Train a CellMatesTransformer model.
 
@@ -141,6 +143,8 @@ def train_model(
         # check if exists
         if not os.path.exists(ckpt_path):
             ckpt_path = None
+        else:
+            print(f"Resuming training from checkpoint: {ckpt_path}")
     else:
         callbacks = None
         ckpt_path = None
@@ -185,14 +189,16 @@ def train_model(
         logger=logger,
         callbacks=callbacks,
         accumulate_grad_batches=accumulate_grad_batches,
-        log_every_n_steps=1,
+        log_every_n_steps=log_every_n_steps,
         # overfit_batches=3, # For debugging
         # devices=1
-        # load from last.ckpt if it exists
-        # os.path.join(
-        #     f"checkpoints/{experiment_name}", "last.ckpt"
-        # ),
         default_root_dir=os.path.join("checkpoints", experiment_name),
+        num_sanity_val_steps=num_sanity_val_steps,
+    )
+
+    # print training details in one line
+    print(
+        f"Training model with D={D}, H={H}, K={K}, F={F}, M={M}, num_encoder_layers={num_encoder_layers}, dropout_p={dropout_p}, activation={activation}, layer_norm_eps={layer_norm_eps}, batch_first={batch_first}, norm_first={norm_first}, bias={bias}, batch_size={batch_size}, num_epochs={n_epochs}, learning_rate={learning_rate}"
     )
 
     # Train the model
