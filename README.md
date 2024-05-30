@@ -9,7 +9,7 @@ Cellmates is a project that aims to understand cell-cell communication using Tra
 To use Cellmates, you need to have the following dependencies installed:
 - Python 3.11
 - PyTorch
-- Install the dataset repository from https://github.com/JonathanSomer/tumor-dynamical-modeling
+- Install the dataset package of tumor-dynamical-modeling
 
 You can install the remaining required dependencies by running the following command:
 ```bash
